@@ -146,4 +146,4 @@ Thumbs.db
 
 # Project specific
 *.sqlite
-*.db
+*.dbtest.json

@@ -1,20 +1,25 @@
+import datetime
+from zoneinfo import ZoneInfo
+
 from tfnsw_trip_planner import TripPlannerClient
 from dotenv import load_dotenv
 import os
+
+_SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 
 load_dotenv()
 
 TRANSPORT_NSW_API_KEY = os.getenv("TRANSPORT_NSW_API_KEY")
 
-print(f"API Key: {TRANSPORT_NSW_API_KEY=}")
+# print(f"API Key: {TRANSPORT_NSW_API_KEY=}")
 
 client = TripPlannerClient(api_key=TRANSPORT_NSW_API_KEY)
 
-locations = client.find_stop("Fermo")
-for loc in locations:
-    print(loc.name)
-    print(loc.id)
-    print(loc.coord)
+# locations = client.find_stop("Fermo")
+# for loc in locations:
+#     print(loc.name)
+#     print(loc.id)
+#     print(loc.coord)
 
 # # Get the best single match
 # best = client.best_stop("Domestic Airport")
@@ -41,9 +46,43 @@ for loc in locations:
 #     if fare:
 #         print(f"  Cost   : ${fare.price_total:.2f} ({fare.status.value})")
 
-departures = client.get_departures("2233133")  # Domestic Airport
+#departures = client.get_departures("2233133")  # Domestic Airport
 
-for event in departures[:2]:
-    mins = event.minutes_until_departure
-    rt   = "⚡" if event.is_realtime else "🕐"
-    print(f"{rt} {mins:>3}m  {event.departure_time} {event.transportation.number:>8}  → {event.transportation.destination_name}")
+# for event in departures[:2]:
+#     mins = event.minutes_until_departure
+#     rt   = "⚡" if event.is_realtime else "🕐"
+#     print(f"{rt} {mins:>3}m  {event.departure_time} {event.transportation.number:>8}  → {event.transportation.destination_name}")
+
+
+# locations = client.find_stop("Centraltation", location_type="any")
+# print(f"Found {len(locations)} locations.")
+# for loc in locations:
+#     print(loc.name, loc.id, loc.coord, loc.type, loc.modes, loc.parent)
+
+journeys = client.plan_trip(
+    origin_id="2233132",   
+    destination_id="200070",
+    arrive_by=True,
+    when=datetime.datetime(2026, 2, 26, 9, 10, 0, tzinfo=_SYDNEY_TZ)
+)
+
+for journey in journeys:
+    print(journey)
+    print(f"  Depart : {journey.departure_time:%H:%M %d/%m/%Y %Z}")
+    print(f"  Arrive : {journey.arrival_time:%H:%M %d/%m/%Y %Z}")
+    print(f"  Route  : {journey.summary}")
+    print()
+    for leg in journey.legs:
+        route = leg.transportation.number or leg.mode.name.title()
+        dest  = leg.transportation.destination_name
+        dep_t = leg.origin.departure_time
+        arr_t = leg.destination.arrival_time
+        plat  = leg.origin.properties.get("platform") or ""
+        plat_str = f"  Platform {plat}" if plat else ""
+        rt    = "⚡" if leg.is_realtime else "  "
+        print(f"  {rt} {leg.mode.name:<12} {route:<10} → {dest}")
+        print(f"       From : {leg.origin.name}{plat_str}")
+        print(f"       Dep  : {dep_t:%H:%M}" if dep_t else "       Dep  : --")
+        print(f"       To   : {leg.destination.name}")
+        print(f"       Arr  : {arr_t:%H:%M}" if arr_t else "       Arr  : --")
+    print()

@@ -1,6 +1,7 @@
 """Main HTTP client for the TfNSW Trip Planner APIs."""
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime
 from typing import Any
@@ -17,6 +18,7 @@ from .models import (
     CyclingProfile,
     Journey,
     Location,
+    LocationType,
     ServiceAlert,
     StopEvent,
 )
@@ -24,6 +26,17 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.transport.nsw.gov.au/v1/tp/"
+
+
+def _to_sydney(dt: datetime) -> datetime:
+    """Ensure a datetime is expressed in Sydney local time.
+
+    Aware datetimes are converted; naive datetimes are assumed to already
+    be Sydney local time and are tagged accordingly.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=_SYDNEY_TZ)
+    return dt.astimezone(_SYDNEY_TZ)
 
 _COMMON_PARAMS: dict[str, str] = {
     "outputFormat": "rapidJSON",
@@ -131,18 +144,22 @@ class TripPlannerClient:
         list[Location]
             Locations sorted by ``match_quality`` (best first).
         """
+        # Always query with type_sf=any — the API silently returns zero results
+        # when a specific type is passed for free-text queries. Filter client-side.
         data = self._get(
             "stop_finder",
             {
-                "type_sf": location_type,
+                "type_sf": "any",
                 "name_sf": query,
-                "anyMaxSizeHitList": max_results,
+                "anyMaxSizeHitList": max_results if location_type == "any" else max_results * 5,
                 "TfNSWSF": "true" if tfnsw_sf else "false",
                 "odvSugMacro": 1,
             },
         )
         locations = [Location.from_dict(loc) for loc in data.get("locations", [])]
-        return sorted(locations, key=lambda l: l.match_quality, reverse=True)
+        if location_type != "any":
+            locations = [l for l in locations if l.type.value == location_type]
+        return sorted(locations, key=lambda l: l.match_quality, reverse=True)[:max_results]
 
     def find_stop_by_id(self, stop_id: str) -> Location | None:
         """
@@ -208,7 +225,7 @@ class TripPlannerClient:
         -------
         list[Journey]
         """
-        dt = when or datetime.now(tz=_SYDNEY_TZ)
+        dt = _to_sydney(when or datetime.now(tz=_SYDNEY_TZ))
         params: dict[str, Any] = {
             "depArrMacro": "arr" if arrive_by else "dep",
             "itdDate": dt.strftime("%Y%m%d"),
@@ -292,7 +309,7 @@ class TripPlannerClient:
             CyclingProfile.MODERATE: 50,
             CyclingProfile.MORE_DIRECT: 100,
         }
-        dt = when or datetime.now(tz=_SYDNEY_TZ)
+        dt = _to_sydney(when or datetime.now(tz=_SYDNEY_TZ))
         params: dict[str, Any] = {
             "depArrMacro": "dep",
             "itdDate": dt.strftime("%Y%m%d"),
@@ -343,7 +360,7 @@ class TripPlannerClient:
         -------
         list[StopEvent]
         """
-        dt = when or datetime.now(tz=_SYDNEY_TZ)
+        dt = _to_sydney(when or datetime.now(tz=_SYDNEY_TZ))
         params: dict[str, Any] = {
             "mode": "direct",
             "type_dm": "stop",
@@ -387,7 +404,7 @@ class TripPlannerClient:
         -------
         list[ServiceAlert]
         """
-        dt = when or datetime.now(tz=_SYDNEY_TZ)
+        dt = _to_sydney(when or datetime.now(tz=_SYDNEY_TZ))
         params: dict[str, Any] = {
             "filterDateValid": dt.strftime("%d-%m-%Y"),
         }

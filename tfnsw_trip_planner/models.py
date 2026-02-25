@@ -45,13 +45,6 @@ class LocationType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class FareStatus(str, Enum):
-    ENABLED = "nswFareEnabled"
-    PARTIALLY_ENABLED = "nswFarePartiallyEnabled"
-    NOT_ENABLED = "nswFareNotEnabled"
-    NOT_AVAILABLE = "nswFareNotAvailable"
-
-
 class CyclingProfile(str, Enum):
     EASIER = "EASIER"
     MODERATE = "MODERATE"
@@ -218,7 +211,10 @@ class Stop:
             if not s:
                 return None
             try:
-                return datetime.fromisoformat(s)
+                # Z means UTC; replace for Python 3.9/3.10 compat, then
+                # convert to Sydney local time.
+                dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                return dt.astimezone(_SYDNEY_TZ)
             except (ValueError, TypeError):
                 return None
 
@@ -253,47 +249,6 @@ class Stop:
 
 
 # ---------------------------------------------------------------------------
-# Fares
-# ---------------------------------------------------------------------------
-
-@dataclass
-class Fare:
-    person: str
-    price_brutto: float
-    price_total: float
-    station_access_fee: float
-    status: FareStatus
-    rider_category_name: str
-    from_leg: int
-    to_leg: int
-    is_summary: bool
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "Fare":
-        props = data.get("properties", {})
-        status_str = props.get("evaluationTicket", "")
-        try:
-            status = FareStatus(status_str)
-        except ValueError:
-            status = FareStatus.NOT_AVAILABLE
-
-        return cls(
-            person=data.get("person", ""),
-            price_brutto=float(data.get("priceBrutto", 0) or 0),
-            price_total=float(props.get("priceTotalFare", 0) or 0),
-            station_access_fee=float(props.get("priceStationAccessFee", 0) or 0),
-            status=status,
-            rider_category_name=props.get("riderCategoryName", ""),
-            from_leg=data.get("fromLeg", 0),
-            to_leg=data.get("toLeg", 0),
-            is_summary="evaluationTicket" in props,
-        )
-
-    def __repr__(self) -> str:
-        return f"Fare(person={self.person!r}, total={self.price_total}, status={self.status})"
-
-
-# ---------------------------------------------------------------------------
 # Service Alerts / Hints
 # ---------------------------------------------------------------------------
 
@@ -310,7 +265,8 @@ class ServiceAlert:
         timestamps = data.get("timestamps", {})
         modified_str = timestamps.get("lastModification")
         try:
-            modified = datetime.fromisoformat(modified_str) if modified_str else None
+            modified_dt = datetime.fromisoformat(modified_str.replace("Z", "+00:00")) if modified_str else None
+            modified = modified_dt.astimezone(_SYDNEY_TZ) if modified_dt else None
         except ValueError:
             modified = None
 
@@ -448,15 +404,11 @@ class Leg:
 class Journey:
     """A complete journey made up of one or more legs."""
     legs: list[Leg]
-    fares: list[Fare]
 
     @classmethod
     def from_dict(cls, data: dict) -> "Journey":
         legs = [Leg.from_dict(l) for l in data.get("legs", [])]
-        fare_raw = data.get("fare", {})
-        tickets = fare_raw.get("tickets", []) if fare_raw else []
-        fares = [Fare.from_dict(t) for t in tickets]
-        return cls(legs=legs, fares=fares)
+        return cls(legs=legs)
 
     @property
     def departure_time(self) -> datetime | None:
@@ -480,17 +432,6 @@ class Journey:
         """Human-readable transport mode summary (e.g. 'Train → Ferry')."""
         modes = [leg.mode.name.replace("_", " ").title() for leg in self.legs]
         return " → ".join(modes)
-
-    @property
-    def fare_summary(self) -> Fare | None:
-        """Returns the total summary fare (ADULT by default if available)."""
-        for fare in self.fares:
-            if fare.is_summary and fare.person == "ADULT":
-                return fare
-        for fare in self.fares:
-            if fare.is_summary:
-                return fare
-        return None
 
     def __repr__(self) -> str:
         mins = self.total_duration // 60
@@ -516,9 +457,9 @@ class StopEvent:
             if not s:
                 return None
             try:
-                dt = datetime.fromisoformat(s)
-                if dt.tzinfo is None:
-                    return dt.replace(tzinfo=_SYDNEY_TZ)
+                # Z means UTC; replace for Python 3.9/3.10 compat, then
+                # convert to Sydney local time.
+                dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
                 return dt.astimezone(_SYDNEY_TZ)
             except (ValueError, TypeError):
                 return None
