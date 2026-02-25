@@ -5,6 +5,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any
+from zoneinfo import ZoneInfo
+
+_SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 
 
 # ---------------------------------------------------------------------------
@@ -513,7 +516,10 @@ class StopEvent:
             if not s:
                 return None
             try:
-                return datetime.fromisoformat(s)
+                dt = datetime.fromisoformat(s)
+                if dt.tzinfo is None:
+                    return dt.replace(tzinfo=_SYDNEY_TZ)
+                return dt.astimezone(_SYDNEY_TZ)
             except (ValueError, TypeError):
                 return None
 

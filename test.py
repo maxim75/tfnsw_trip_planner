@@ -43,7 +43,7 @@ for loc in locations:
 
 departures = client.get_departures("2233133")  # Domestic Airport
 
-for event in departures:
+for event in departures[:2]:
     mins = event.minutes_until_departure
     rt   = "⚡" if event.is_realtime else "🕐"
     print(f"{rt} {mins:>3}m  {event.departure_time} {event.transportation.number:>8}  → {event.transportation.destination_name}")

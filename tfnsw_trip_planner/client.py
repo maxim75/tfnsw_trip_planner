@@ -4,6 +4,9 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
+
+_SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 from urllib.parse import urlencode
 
 import requests
@@ -205,7 +208,7 @@ class TripPlannerClient:
         -------
         list[Journey]
         """
-        dt = when or datetime.now()
+        dt = when or datetime.now(tz=_SYDNEY_TZ)
         params: dict[str, Any] = {
             "depArrMacro": "arr" if arrive_by else "dep",
             "itdDate": dt.strftime("%Y%m%d"),
@@ -289,7 +292,7 @@ class TripPlannerClient:
             CyclingProfile.MODERATE: 50,
             CyclingProfile.MORE_DIRECT: 100,
         }
-        dt = when or datetime.now()
+        dt = when or datetime.now(tz=_SYDNEY_TZ)
         params: dict[str, Any] = {
             "depArrMacro": "dep",
             "itdDate": dt.strftime("%Y%m%d"),
@@ -340,7 +343,7 @@ class TripPlannerClient:
         -------
         list[StopEvent]
         """
-        dt = when or datetime.now()
+        dt = when or datetime.now(tz=_SYDNEY_TZ)
         params: dict[str, Any] = {
             "mode": "direct",
             "type_dm": "stop",
@@ -384,7 +387,7 @@ class TripPlannerClient:
         -------
         list[ServiceAlert]
         """
-        dt = when or datetime.now()
+        dt = when or datetime.now(tz=_SYDNEY_TZ)
         params: dict[str, Any] = {
             "filterDateValid": dt.strftime("%d-%m-%Y"),
         }
