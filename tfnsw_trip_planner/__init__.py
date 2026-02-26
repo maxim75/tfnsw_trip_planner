@@ -13,4 +13,4 @@ __all__ = [
     "TripPlannerError", "APIError", "NetworkError",
 ]
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"

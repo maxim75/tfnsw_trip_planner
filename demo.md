@@ -138,16 +138,16 @@ for event in departures[:10]:
 
     Next 10 departures from Domestic Airport at 09:00 27/02/2026:
     
-      🕐   606m   09:00   T8 Airport & South Line   → Sydenham
-      🕐   606m   09:00   CCWB Watsons Bay Ferry   → Watsons Bay
-      🕐   606m   09:00   F6 Mosman Bay   → Mosman Bay
-      🕐   606m   09:00        343   → Kingsford
-      🕐   606m   09:00        396   → Maroubra Beach
-      🕐   608m   09:02        333   → North Bondi
-      🕐   608m   09:02   L2 Randwick Line   → Randwick
-      🕐   609m   09:03   T8 Airport & South Line   → Macarthur via Airport
-      🕐   610m   09:04   T2 Leppington & Inner West Line   → Leppington via Granville
-      🕐   611m   09:05   CCSH Shark Island Ferry   → Shark Island
+      🕐   604m   09:00   T8 Airport & South Line   → Sydenham
+      🕐   604m   09:00   CCWB Watsons Bay Ferry   → Watsons Bay
+      🕐   604m   09:00   F6 Mosman Bay   → Mosman Bay
+      🕐   604m   09:00        343   → Kingsford
+      🕐   604m   09:00        396   → Maroubra Beach
+      🕐   606m   09:02        333   → North Bondi
+      🕐   606m   09:02   L2 Randwick Line   → Randwick
+      🕐   607m   09:03   T8 Airport & South Line   → Macarthur via Airport
+      🕐   608m   09:04   T2 Leppington & Inner West Line   → Leppington via Granville
+      🕐   609m   09:05   CCSH Shark Island Ferry   → Shark Island
 
 
 ## 6 · Plan a Trip Between Two Stops
@@ -488,30 +488,30 @@ else:
 
     161 current alert(s):
     
-      Route 712 will no longer operate from 3 March
-        Last updated : 19/02/2025 13:19
-        Affects      : 0 stop(s), 2 line(s)
-        URL          : https://transportnsw.info/alerts/details#/ems-47813
-    
-      Restrictions may apply - confirm when booking
-        Last updated : 25/11/2024 10:59
-        Affects      : 0 stop(s), 2 line(s)
-        URL          : https://transportnsw.info/alerts/details#/ems-195
-    
-      Lithgow bus disruptions
-        Last updated : 26/02/2026 14:36
+      Now ending at
+        Last updated : 05/11/2023 07:14
         Affects      : 0 stop(s), 1 line(s)
-        URL          : https://transportnsw.info/alerts/details#/ems-66075
+        URL          : https://transportnsw.info/alerts/details#/61de3fd88b9470e1d61debe983ed2752827d2e14
     
-      Station Update - Parramatta
-        Last updated : 20/02/2026 13:30
-        Affects      : 1 stop(s), 18 line(s)
-        URL          : https://transportnsw.info/alerts/details#/c8f1b67538aaf404295e35a56affec398cfa2838
-    
-      Running late
-        Last updated : 24/05/2025 22:22
+      Added Stops
+        Last updated : 05/05/2025 12:27
         Affects      : 0 stop(s), 1 line(s)
-        URL          : https://transportnsw.info/alerts/details#/5e18016b53e9d923d3366c25cf8be6a40b3893f1
+        URL          : https://transportnsw.info/alerts/details#/b08cab8386bef41f49b857d64e30303a2851c310
+    
+      Added Stops
+        Last updated : 03/01/2025 17:12
+        Affects      : 0 stop(s), 1 line(s)
+        URL          : https://transportnsw.info/alerts/details#/7fffbf7871d4c94d0f98607a4c0c9504e0b7354a
+    
+      Cancelled
+        Last updated : 09/09/2024 10:20
+        Affects      : 0 stop(s), 6 line(s)
+        URL          : https://transportnsw.info/alerts/details#/4137f2cad80d717484b0169a7a7eb2165fe53a1b
+    
+      Connections with other services cannot be guaranteed
+        Last updated : 27/06/2022 16:10
+        Affects      : 0 stop(s), 145 line(s)
+        URL          : https://transportnsw.info/alerts/details#/ems-199
     
 
 
@@ -596,60 +596,6 @@ for loc in nearby[:8]:
         Distance : 864
         Coord    : Coordinate(lat=-33.863994, lon=151.211764)
     
-
-
-
-```python
-# Debug: inspect the raw coord API response to find the correct field names
-import json
-lat, lon = -33.8568, 151.2153
-coord_str = f"{lon:.6f}:{lat:.6f}:EPSG:4326"
-raw = client._get("coord", {
-    "coord": coord_str,
-    "type_1": "STOP",
-    "radius_1": 10000,
-    "inclFilter": 1,
-    "outputFormat": "rapidJSON",
-    "coordOutputFormat": "EPSG:4326",
-})
-locations_raw = raw.get("locations", [])
-if locations_raw:
-    print("First location raw keys:", list(locations_raw[0].keys()))
-    print(json.dumps(locations_raw[0], indent=2))
-```
-
-    First location raw keys: ['id', 'isGlobalId', 'name', 'type', 'coord', 'parent', 'productClasses', 'properties', 'disassembledName']
-    {
-      "id": "200020",
-      "isGlobalId": true,
-      "name": "undefined, undefined",
-      "type": "stop",
-      "coord": [
-        -33.861351,
-        151.210813
-      ],
-      "parent": {
-        "id": "200020",
-        "name": "undefined, undefined",
-        "type": "locality"
-      },
-      "productClasses": [
-        1,
-        4,
-        5,
-        9
-      ],
-      "properties": {
-        "distance": 654,
-        "STOP_GLOBAL_ID": "200020",
-        "STOP_NAME_WITH_PLACE": "Circular Quay, Sydney",
-        "STOP_MAJOR_MEANS": "2",
-        "STOP_MEANS_LIST": "2,4,3,10",
-        "STOP_MOT_LIST": "1,4,5,9",
-        "stopId": "10101103"
-      },
-      "disassembledName": "undefined, undefined"
-    }
 
 
 ## 11 · Export to Markdown
