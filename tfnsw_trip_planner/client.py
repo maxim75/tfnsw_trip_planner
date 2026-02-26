@@ -424,6 +424,17 @@ class TripPlannerClient:
     # Coordinate Request API
     # ------------------------------------------------------------------
 
+    #: Valid ``type_1`` values for :meth:`find_nearby`.
+    NEARBY_TYPES: tuple[str, ...] = (
+        "GIS_POINT",   # Generic point of interest (default)
+        "STOP",        # Public transport stops
+        "POI",         # Points of interest
+        "BUS_POINT",   # Bus stops only
+        "TRAIN_POINT", # Train stations only
+        "FERRY_POINT", # Ferry wharves only
+        "LIGHTRAIL_POINT", # Light rail stops only
+    )
+
     def find_nearby(
         self,
         latitude: float,
@@ -434,7 +445,7 @@ class TripPlannerClient:
         draw_class: int | None = None,
     ) -> list[Location]:
         """
-        Find stops, POIs or Opal resellers near a coordinate.
+        Find stops, POIs or other locations near a coordinate.
 
         Parameters
         ----------
@@ -443,9 +454,17 @@ class TripPlannerClient:
         radius_m : int
             Search radius in metres (default 500).
         type_1 : str
-            Location type filter (default ``"GIS_POINT"``).
+            Location type filter. Valid values (see ``NEARBY_TYPES``):
+
+            - ``"GIS_POINT"``       — generic points of interest (default)
+            - ``"STOP"``            — all public transport stops
+            - ``"POI"``             — points of interest
+            - ``"BUS_POINT"``       — bus stops only
+            - ``"TRAIN_POINT"``     — train stations only
+            - ``"FERRY_POINT"``     — ferry wharves only
+            - ``"LIGHTRAIL_POINT"`` — light rail stops only
         draw_class : int, optional
-            Draw class filter. Use ``74`` for Opal resellers.
+            Draw class filter (e.g. ``74`` for Opal resellers).
 
         Returns
         -------
@@ -463,20 +482,6 @@ class TripPlannerClient:
 
         data = self._get("coord", params)
         return [Location.from_dict(loc) for loc in data.get("locations", [])]
-
-    def find_opal_resellers(
-        self,
-        latitude: float,
-        longitude: float,
-        radius_m: int = 1000,
-    ) -> list[Location]:
-        """Find Opal ticket resellers near *latitude*, *longitude*."""
-        return self.find_nearby(
-            latitude,
-            longitude,
-            radius_m=radius_m,
-            draw_class=74,
-        )
 
     # ------------------------------------------------------------------
     # Convenience helpers
