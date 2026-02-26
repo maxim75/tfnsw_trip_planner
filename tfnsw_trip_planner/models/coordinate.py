@@ -11,7 +11,7 @@ class Coordinate:
 
     @classmethod
     def from_list(cls, coords: list[float]) -> "Coordinate | None":
-        if coords and len(coords) >= 2:
+        if coords and len(coords) == 2:
             return cls(latitude=coords[0], longitude=coords[1])
         return None
 

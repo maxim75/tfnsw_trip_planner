@@ -11,6 +11,12 @@ echo "TfNSW Trip Planner - Build & Publish"
 echo "=========================================="
 echo ""
 
+# Run unit tests
+echo "🧪 Running unit tests..."
+python -m pytest tests/ -v
+echo "✓ All tests passed"
+echo ""
+
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
 rm -rf build/ dist/ *.egg-info
