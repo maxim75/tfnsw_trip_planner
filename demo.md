@@ -138,16 +138,16 @@ for event in departures[:10]:
 
     Next 10 departures from Domestic Airport at 09:00 27/02/2026:
     
-      🕐   604m   09:00   T8 Airport & South Line   → Sydenham
-      🕐   604m   09:00   CCWB Watsons Bay Ferry   → Watsons Bay
-      🕐   604m   09:00   F6 Mosman Bay   → Mosman Bay
-      🕐   604m   09:00        343   → Kingsford
-      🕐   604m   09:00        396   → Maroubra Beach
-      🕐   606m   09:02        333   → North Bondi
-      🕐   606m   09:02   L2 Randwick Line   → Randwick
-      🕐   607m   09:03   T8 Airport & South Line   → Macarthur via Airport
-      🕐   608m   09:04   T2 Leppington & Inner West Line   → Leppington via Granville
-      🕐   609m   09:05   CCSH Shark Island Ferry   → Shark Island
+      🕐   595m   09:00   T8 Airport & South Line   → Sydenham
+      🕐   595m   09:00   CCWB Watsons Bay Ferry   → Watsons Bay
+      🕐   595m   09:00   F6 Mosman Bay   → Mosman Bay
+      🕐   595m   09:00        343   → Kingsford
+      🕐   595m   09:00        396   → Maroubra Beach
+      🕐   597m   09:02        333   → North Bondi
+      🕐   597m   09:02   L2 Randwick Line   → Randwick
+      🕐   598m   09:03   T8 Airport & South Line   → Macarthur via Airport
+      🕐   599m   09:04   T2 Leppington & Inner West Line   → Leppington via Granville
+      🕐   600m   09:05   CCSH Shark Island Ferry   → Shark Island
 
 
 ## 6 · Plan a Trip Between Two Stops
@@ -486,32 +486,32 @@ else:
     print("No current service alerts.")
 ```
 
-    161 current alert(s):
+    162 current alert(s):
     
-      Now ending at
-        Last updated : 05/11/2023 07:14
+      Restrictions may apply - confirm when booking
+        Last updated : 25/11/2024 10:59
+        Affects      : 0 stop(s), 2 line(s)
+        URL          : https://transportnsw.info/alerts/details#/ems-195
+    
+      Lithgow bus disruptions
+        Last updated : 26/02/2026 14:36
         Affects      : 0 stop(s), 1 line(s)
-        URL          : https://transportnsw.info/alerts/details#/61de3fd88b9470e1d61debe983ed2752827d2e14
+        URL          : https://transportnsw.info/alerts/details#/ems-66075
     
-      Added Stops
-        Last updated : 05/05/2025 12:27
+      Station Update - Parramatta
+        Last updated : 20/02/2026 13:30
+        Affects      : 1 stop(s), 18 line(s)
+        URL          : https://transportnsw.info/alerts/details#/c8f1b67538aaf404295e35a56affec398cfa2838
+    
+      Jeanette St, Regentville, temporary bus stop closures
+        Last updated : 29/08/2024 09:26
+        Affects      : 0 stop(s), 3 line(s)
+        URL          : https://transportnsw.info/alerts/details#/ems-38773
+    
+      Running late
+        Last updated : 12/02/2026 05:36
         Affects      : 0 stop(s), 1 line(s)
-        URL          : https://transportnsw.info/alerts/details#/b08cab8386bef41f49b857d64e30303a2851c310
-    
-      Added Stops
-        Last updated : 03/01/2025 17:12
-        Affects      : 0 stop(s), 1 line(s)
-        URL          : https://transportnsw.info/alerts/details#/7fffbf7871d4c94d0f98607a4c0c9504e0b7354a
-    
-      Cancelled
-        Last updated : 09/09/2024 10:20
-        Affects      : 0 stop(s), 6 line(s)
-        URL          : https://transportnsw.info/alerts/details#/4137f2cad80d717484b0169a7a7eb2165fe53a1b
-    
-      Connections with other services cannot be guaranteed
-        Last updated : 27/06/2022 16:10
-        Affects      : 0 stop(s), 145 line(s)
-        URL          : https://transportnsw.info/alerts/details#/ems-199
+        URL          : https://transportnsw.info/alerts/details#/3c581b0a54b4a9636bc54248db37f04ab9e058f3
     
 
 
