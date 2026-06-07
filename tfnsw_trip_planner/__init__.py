@@ -2,7 +2,8 @@
 from .client import TripPlannerClient
 from .models import (
     Location, Journey, Leg, StopEvent, ServiceAlert,
-    Stop, Transport, Coordinate, CyclingProfile, TransportMode
+    Stop, Transport, Coordinate, CyclingProfile, TransportMode,
+    VehiclePosition
 )
 from .exceptions import TripPlannerError, APIError, NetworkError
 
@@ -10,7 +11,8 @@ __all__ = [
     "TripPlannerClient",
     "Location", "Journey", "Leg", "StopEvent", "ServiceAlert",
     "Stop", "Transport", "Coordinate", "CyclingProfile", "TransportMode",
+    "VehiclePosition",
     "TripPlannerError", "APIError", "NetworkError",
 ]
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"

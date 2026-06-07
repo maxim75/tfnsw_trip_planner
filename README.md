@@ -1,6 +1,6 @@
 # TfNSW Trip Planner — Python Client
 
-A clean, idiomatic Python library for the [Transport for NSW Trip Planning APIs](https://opendata.transport.nsw.gov.au/node/601/exploreapi).
+A clean, idiomatic Python library for the [Transport for NSW Trip Planning APIs](https://opendata.transport.nsw.gov.au/data/dataset/trip-planner-apis).
 
 ---
 
@@ -18,6 +18,31 @@ from tfnsw_trip_planner import TripPlannerClient
 
 ---
 
+## Getting an API Key
+
+The API key is free. You get one from the TfNSW Open Data portal:
+
+1. **Create an account** at <https://opendata.transport.nsw.gov.au/data/user/register> (or [log in](https://opendata.transport.nsw.gov.au/data/user/login) if you already have one).
+2. **Create an Application**: from your account menu open **Applications → Create Application**, give it a name, and select the API products you need. At minimum add **Trip Planner**. For live vehicle positions (example 11) also add **Public Transport – Realtime Vehicle Positions**.
+3. **Copy the API key** shown for that application. The same key authenticates every endpoint in this library.
+
+> **Note:** Each *API product* must be added to your application separately. If a call returns `401`/`403`, the most common cause is that the relevant product (e.g. Realtime Vehicle Positions) isn't enabled on your key yet.
+
+Pass the key when constructing the client:
+
+```python
+client = TripPlannerClient(api_key="YOUR_API_KEY")
+```
+
+Avoid hard-coding the key in source — read it from the environment instead:
+
+```python
+import os
+client = TripPlannerClient(api_key=os.environ["TFNSW_API_KEY"])
+```
+
+---
+
 ## Quick Start
 
 ```python
@@ -26,7 +51,7 @@ from tfnsw_trip_planner import TripPlannerClient
 client = TripPlannerClient(api_key="YOUR_API_KEY")
 ```
 
-> Get your free API key at <https://opendata.transport.nsw.gov.au>
+> Don't have a key yet? See [Getting an API Key](#getting-an-api-key) above.
 
 ---
 
@@ -176,6 +201,46 @@ for r in resellers:
     print(r.name, r.coord)
 ```
 
+### 11. Live Vehicle Positions (GTFS-Realtime)
+
+Get the **exact GPS location** of vehicles in real time (latitude/longitude,
+bearing, speed) — as opposed to the real-time *timing* estimates returned by the
+trip/departure endpoints.
+
+This uses the separate GTFS-Realtime Vehicle Positions feed. You must subscribe
+to that API product on the [Open Data portal](https://opendata.transport.nsw.gov.au)
+(the same API key is used), and install the optional dependency:
+
+```bash
+pip install tfnsw-trip-planner[realtime]
+```
+
+```python
+# mode is appended to the vehiclepos/ endpoint — see client.VEHICLE_POSITION_MODES
+buses = client.vehicle_positions("buses")
+
+for v in buses[:5]:
+    print(f"{v.vehicle_id}  route={v.route_id}  "
+          f"{v.latitude:.5f},{v.longitude:.5f}  "
+          f"bearing={v.bearing}  @ {v.timestamp}")
+
+# Other feeds: "nswtrains", "metro", "ferries/sydneyferries",
+#              "lightrail/cbdandsoutheast", "lightrail/newcastle", ...
+ferries = client.vehicle_positions("ferries/sydneyferries")
+```
+
+**Filtering by route.** Each feed returns *every* vehicle for that mode (the
+buses feed is ~1,000 vehicles), so filter client-side. `route_id` is formatted
+`<prefix>_<routeShortName>` (e.g. `2510_992`), so match on the suffix:
+
+```python
+buses = client.vehicle_positions("buses")
+on_992 = [b for b in buses if b.route_id and b.route_id.split("_")[-1] == "992"]
+```
+
+> Vehicles without a current GPS fix report `latitude`/`longitude` of `0.0` —
+> filter those out if you're plotting positions.
+
 ---
 
 ## Using as a Context Manager
@@ -203,6 +268,7 @@ with TripPlannerClient(api_key="YOUR_KEY") as client:
 | `get_alerts(...)` | Service alerts |
 | `find_nearby(lat, lon, ...)` | POIs near a coordinate |
 | `find_opal_resellers(lat, lon, ...)` | Opal resellers near a coordinate |
+| `vehicle_positions(mode)` | Live vehicle GPS positions (GTFS-Realtime) |
 
 ### Key Models
 
@@ -217,6 +283,7 @@ with TripPlannerClient(api_key="YOUR_KEY") as client:
 | `Fare` | `person`, `price_total`, `station_access_fee`, `status` |
 | `ServiceAlert` | `subtitle`, `url`, `affected_stops`, `affected_lines` |
 | `TravelInCars` | `number_of_cars`, `from_car`, `to_car`, `message` |
+| `VehiclePosition` | `vehicle_id`, `route_id`, `trip_id`, `latitude`, `longitude`, `bearing`, `speed`, `timestamp`, `coord` |
 
 ### `CyclingProfile` Enum
 
