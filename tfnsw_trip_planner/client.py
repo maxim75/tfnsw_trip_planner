@@ -21,11 +21,13 @@ from .models import (
     LocationType,
     ServiceAlert,
     StopEvent,
+    VehiclePosition,
 )
 
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.transport.nsw.gov.au/v1/tp/"
+_GTFS_VEHICLEPOS_URL = "https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/"
 
 
 def _to_sydney(dt: datetime) -> datetime:
@@ -111,6 +113,23 @@ class TripPlannerClient:
             return response.json()
         except ValueError as exc:
             raise APIError(f"Invalid JSON response: {exc}") from exc
+
+    def _get_bytes(self, url: str) -> bytes:
+        """Perform a GET request and return the raw response body."""
+        logger.debug("GET %s", url)
+        try:
+            response: Response = self._session.get(url, timeout=self.timeout)
+        except requests.ConnectionError as exc:
+            raise NetworkError(f"Connection error: {exc}") from exc
+        except requests.Timeout as exc:
+            raise NetworkError(f"Request timed out after {self.timeout}s") from exc
+
+        if not response.ok:
+            raise APIError(
+                f"API error {response.status_code}: {response.text[:200]}",
+                status_code=response.status_code,
+            )
+        return response.content
 
     # ------------------------------------------------------------------
     # Stop Finder API
@@ -482,6 +501,70 @@ class TripPlannerClient:
 
         data = self._get("coord", params)
         return [Location.from_dict(loc) for loc in data.get("locations", [])]
+
+    # ------------------------------------------------------------------
+    # GTFS-Realtime Vehicle Positions API
+    # ------------------------------------------------------------------
+
+    #: Common ``mode`` values for :meth:`vehicle_positions`. Any path accepted
+    #: by the ``/v1/gtfs/vehiclepos/`` endpoint works (e.g.
+    #: ``"ferries/sydneyferries"``, ``"lightrail/cbdandsoutheast"``).
+    VEHICLE_POSITION_MODES: tuple[str, ...] = (
+        "buses",
+        "ferries/sydneyferries",
+        "lightrail/cbdandsoutheast",
+        "lightrail/innerwest",
+        "lightrail/newcastle",
+        "lightrail/parramatta",
+        "metro",
+        "nswtrains",
+        "sydneytrains",
+    )
+
+    def vehicle_positions(self, mode: str) -> list[VehiclePosition]:
+        """
+        Fetch live vehicle positions from the GTFS-Realtime feed.
+
+        This returns each vehicle's current GPS location (latitude/longitude,
+        bearing, speed) as reported by the vehicle, unlike the Trip Planner
+        endpoints which only return real-time *timing* estimates.
+
+        Requires the optional ``gtfs-realtime-bindings`` dependency::
+
+            pip install tfnsw-trip-planner[realtime]
+
+        Note that the GTFS-Realtime Vehicle Positions API is a separate product
+        on the TfNSW Open Data portal — you must subscribe to it (the same API
+        key is used).
+
+        Parameters
+        ----------
+        mode : str
+            Feed to query, appended to the ``vehiclepos/`` endpoint. See
+            ``VEHICLE_POSITION_MODES`` for common values (e.g. ``"buses"``,
+            ``"sydneytrains"``, ``"ferries/sydneyferries"``).
+
+        Returns
+        -------
+        list[VehiclePosition]
+        """
+        try:
+            from google.transit import gtfs_realtime_pb2
+        except ImportError as exc:  # pragma: no cover - import guard
+            raise ImportError(
+                "vehicle_positions() requires the 'gtfs-realtime-bindings' package. "
+                "Install it with: pip install tfnsw-trip-planner[realtime]"
+            ) from exc
+
+        raw = self._get_bytes(_GTFS_VEHICLEPOS_URL + mode.strip("/"))
+        feed = gtfs_realtime_pb2.FeedMessage()
+        try:
+            feed.ParseFromString(raw)
+        except Exception as exc:  # protobuf raises DecodeError
+            raise APIError(f"Failed to parse GTFS-Realtime feed: {exc}") from exc
+
+        positions = [VehiclePosition.from_entity(e) for e in feed.entity]
+        return [p for p in positions if p is not None]
 
     # ------------------------------------------------------------------
     # Convenience helpers

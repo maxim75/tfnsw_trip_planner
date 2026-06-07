@@ -12,6 +12,7 @@ from .travel_in_cars import TravelInCars
 from .leg import Leg
 from .journey import Journey
 from .stop_event import StopEvent
+from .vehicle_position import VehiclePosition
 
 __all__ = [
     "CyclingProfile",
@@ -29,4 +30,5 @@ __all__ = [
     "Leg",
     "Journey",
     "StopEvent",
+    "VehiclePosition",
 ]

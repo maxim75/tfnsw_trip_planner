@@ -176,6 +176,34 @@ for r in resellers:
     print(r.name, r.coord)
 ```
 
+### 11. Live Vehicle Positions (GTFS-Realtime)
+
+Get the **exact GPS location** of vehicles in real time (latitude/longitude,
+bearing, speed) — as opposed to the real-time *timing* estimates returned by the
+trip/departure endpoints.
+
+This uses the separate GTFS-Realtime Vehicle Positions feed. You must subscribe
+to that API product on the [Open Data portal](https://opendata.transport.nsw.gov.au)
+(the same API key is used), and install the optional dependency:
+
+```bash
+pip install tfnsw-trip-planner[realtime]
+```
+
+```python
+# mode is appended to the vehiclepos/ endpoint — see client.VEHICLE_POSITION_MODES
+buses = client.vehicle_positions("buses")
+
+for v in buses[:5]:
+    print(f"{v.vehicle_id}  route={v.route_id}  "
+          f"{v.latitude:.5f},{v.longitude:.5f}  "
+          f"bearing={v.bearing}  @ {v.timestamp}")
+
+# Other feeds: "sydneytrains", "metro", "ferries/sydneyferries",
+#              "lightrail/cbdandsoutheast", "nswtrains", ...
+ferries = client.vehicle_positions("ferries/sydneyferries")
+```
+
 ---
 
 ## Using as a Context Manager
@@ -203,6 +231,7 @@ with TripPlannerClient(api_key="YOUR_KEY") as client:
 | `get_alerts(...)` | Service alerts |
 | `find_nearby(lat, lon, ...)` | POIs near a coordinate |
 | `find_opal_resellers(lat, lon, ...)` | Opal resellers near a coordinate |
+| `vehicle_positions(mode)` | Live vehicle GPS positions (GTFS-Realtime) |
 
 ### Key Models
 
@@ -217,6 +246,7 @@ with TripPlannerClient(api_key="YOUR_KEY") as client:
 | `Fare` | `person`, `price_total`, `station_access_fee`, `status` |
 | `ServiceAlert` | `subtitle`, `url`, `affected_stops`, `affected_lines` |
 | `TravelInCars` | `number_of_cars`, `from_car`, `to_car`, `message` |
+| `VehiclePosition` | `vehicle_id`, `route_id`, `trip_id`, `latitude`, `longitude`, `bearing`, `speed`, `timestamp`, `coord` |
 
 ### `CyclingProfile` Enum
 
