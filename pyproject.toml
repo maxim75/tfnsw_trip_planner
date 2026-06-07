@@ -51,6 +51,7 @@ realtime = [
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
+    "python-dotenv>=1.0.0",
     "black>=23.7.0",
     "isort>=5.12.0",
     "mypy>=1.5.0",
@@ -94,6 +95,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "integration: live tests that hit the real TfNSW API (require TFNSW_API_KEY)",
+]
 
 [tool.ruff]
 line-length = 100

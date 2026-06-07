@@ -224,10 +224,22 @@ for v in buses[:5]:
           f"{v.latitude:.5f},{v.longitude:.5f}  "
           f"bearing={v.bearing}  @ {v.timestamp}")
 
-# Other feeds: "sydneytrains", "metro", "ferries/sydneyferries",
-#              "lightrail/cbdandsoutheast", "nswtrains", ...
+# Other feeds: "nswtrains", "metro", "ferries/sydneyferries",
+#              "lightrail/cbdandsoutheast", "lightrail/newcastle", ...
 ferries = client.vehicle_positions("ferries/sydneyferries")
 ```
+
+**Filtering by route.** Each feed returns *every* vehicle for that mode (the
+buses feed is ~1,000 vehicles), so filter client-side. `route_id` is formatted
+`<prefix>_<routeShortName>` (e.g. `2510_992`), so match on the suffix:
+
+```python
+buses = client.vehicle_positions("buses")
+on_992 = [b for b in buses if b.route_id and b.route_id.split("_")[-1] == "992"]
+```
+
+> Vehicles without a current GPS fix report `latitude`/`longitude` of `0.0` —
+> filter those out if you're plotting positions.
 
 ---
 

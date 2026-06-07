@@ -507,18 +507,16 @@ class TripPlannerClient:
     # ------------------------------------------------------------------
 
     #: Common ``mode`` values for :meth:`vehicle_positions`. Any path accepted
-    #: by the ``/v1/gtfs/vehiclepos/`` endpoint works (e.g.
-    #: ``"ferries/sydneyferries"``, ``"lightrail/cbdandsoutheast"``).
+    #: by the ``/v1/gtfs/vehiclepos/`` endpoint works; region bus feeds take a
+    #: region suffix (e.g. ``"regionbuses/southerntablelands"``).
     VEHICLE_POSITION_MODES: tuple[str, ...] = (
         "buses",
         "ferries/sydneyferries",
         "lightrail/cbdandsoutheast",
-        "lightrail/innerwest",
         "lightrail/newcastle",
         "lightrail/parramatta",
         "metro",
         "nswtrains",
-        "sydneytrains",
     )
 
     def vehicle_positions(self, mode: str) -> list[VehiclePosition]:
