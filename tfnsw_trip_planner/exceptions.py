@@ -1,4 +1,5 @@
 """Custom exceptions for TfNSW Trip Planner client."""
+from __future__ import annotations
 
 
 class TripPlannerError(Exception):
