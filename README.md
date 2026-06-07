@@ -1,6 +1,6 @@
 # TfNSW Trip Planner — Python Client
 
-A clean, idiomatic Python library for the [Transport for NSW Trip Planning APIs](https://opendata.transport.nsw.gov.au/node/601/exploreapi).
+A clean, idiomatic Python library for the [Transport for NSW Trip Planning APIs](https://opendata.transport.nsw.gov.au/data/dataset/trip-planner-apis).
 
 ---
 
@@ -18,6 +18,31 @@ from tfnsw_trip_planner import TripPlannerClient
 
 ---
 
+## Getting an API Key
+
+The API key is free. You get one from the TfNSW Open Data portal:
+
+1. **Create an account** at <https://opendata.transport.nsw.gov.au/data/user/register> (or [log in](https://opendata.transport.nsw.gov.au/data/user/login) if you already have one).
+2. **Create an Application**: from your account menu open **Applications → Create Application**, give it a name, and select the API products you need. At minimum add **Trip Planner**. For live vehicle positions (example 11) also add **Public Transport – Realtime Vehicle Positions**.
+3. **Copy the API key** shown for that application. The same key authenticates every endpoint in this library.
+
+> **Note:** Each *API product* must be added to your application separately. If a call returns `401`/`403`, the most common cause is that the relevant product (e.g. Realtime Vehicle Positions) isn't enabled on your key yet.
+
+Pass the key when constructing the client:
+
+```python
+client = TripPlannerClient(api_key="YOUR_API_KEY")
+```
+
+Avoid hard-coding the key in source — read it from the environment instead:
+
+```python
+import os
+client = TripPlannerClient(api_key=os.environ["TFNSW_API_KEY"])
+```
+
+---
+
 ## Quick Start
 
 ```python
@@ -26,7 +51,7 @@ from tfnsw_trip_planner import TripPlannerClient
 client = TripPlannerClient(api_key="YOUR_API_KEY")
 ```
 
-> Get your free API key at <https://opendata.transport.nsw.gov.au>
+> Don't have a key yet? See [Getting an API Key](#getting-an-api-key) above.
 
 ---
 
