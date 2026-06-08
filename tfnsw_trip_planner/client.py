@@ -1,24 +1,21 @@
 """Main HTTP client for the TfNSW Trip Planner APIs."""
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime
 from typing import Any
-from zoneinfo import ZoneInfo
-
-_SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
 
 import requests
 from requests import Response, Session
 
 from .exceptions import APIError, NetworkError
 from .models import (
+    Coordinate,
     CyclingProfile,
     Journey,
     Location,
-    LocationType,
     ServiceAlert,
     StopEvent,
     VehiclePosition,
@@ -28,6 +25,12 @@ logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.transport.nsw.gov.au/v1/tp/"
 _GTFS_VEHICLEPOS_URL = "https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/"
+_SYDNEY_TZ = ZoneInfo("Australia/Sydney")
+
+_COMMON_PARAMS: dict[str, str] = {
+    "outputFormat": "rapidJSON",
+    "coordOutputFormat": "EPSG:4326",
+}
 
 
 def _to_sydney(dt: datetime) -> datetime:
@@ -40,10 +43,16 @@ def _to_sydney(dt: datetime) -> datetime:
         return dt.replace(tzinfo=_SYDNEY_TZ)
     return dt.astimezone(_SYDNEY_TZ)
 
-_COMMON_PARAMS: dict[str, str] = {
-    "outputFormat": "rapidJSON",
-    "coordOutputFormat": "EPSG:4326",
-}
+
+def _when_params(when: datetime | None) -> dict[str, str]:
+    """Return the ``itdDate``/``itdTime`` params for *when* (defaults to now)."""
+    dt = _to_sydney(when or datetime.now(tz=_SYDNEY_TZ))
+    return {"itdDate": dt.strftime("%Y%m%d"), "itdTime": dt.strftime("%H%M")}
+
+
+def _bool(value: bool) -> str:
+    """Render a Python bool as the API's lowercase ``"true"``/``"false"``."""
+    return "true" if value else "false"
 
 
 class TripPlannerClient:
@@ -91,13 +100,11 @@ class TripPlannerClient:
     # Low-level HTTP helpers
     # ------------------------------------------------------------------
 
-    def _get(self, endpoint: str, params: dict[str, Any]) -> dict:
-        """Perform a GET request and return parsed JSON."""
-        merged = {**_COMMON_PARAMS, **params}
-        url = _BASE_URL + endpoint
-        logger.debug("GET %s?%s", url, urlencode(merged))
+    def _request(self, url: str, params: dict[str, Any] | None = None) -> Response:
+        """GET *url*, raising on connection/timeout/non-2xx responses."""
+        logger.debug("GET %s?%s", url, urlencode(params or {}))
         try:
-            response: Response = self._session.get(url, params=merged, timeout=self.timeout)
+            response = self._session.get(url, params=params, timeout=self.timeout)
         except requests.ConnectionError as exc:
             raise NetworkError(f"Connection error: {exc}") from exc
         except requests.Timeout as exc:
@@ -108,7 +115,11 @@ class TripPlannerClient:
                 f"API error {response.status_code}: {response.text[:200]}",
                 status_code=response.status_code,
             )
+        return response
 
+    def _get(self, endpoint: str, params: dict[str, Any]) -> dict:
+        """Perform a GET request against a trip-planning endpoint and return parsed JSON."""
+        response = self._request(_BASE_URL + endpoint, {**_COMMON_PARAMS, **params})
         try:
             return response.json()
         except ValueError as exc:
@@ -116,20 +127,7 @@ class TripPlannerClient:
 
     def _get_bytes(self, url: str) -> bytes:
         """Perform a GET request and return the raw response body."""
-        logger.debug("GET %s", url)
-        try:
-            response: Response = self._session.get(url, timeout=self.timeout)
-        except requests.ConnectionError as exc:
-            raise NetworkError(f"Connection error: {exc}") from exc
-        except requests.Timeout as exc:
-            raise NetworkError(f"Request timed out after {self.timeout}s") from exc
-
-        if not response.ok:
-            raise APIError(
-                f"API error {response.status_code}: {response.text[:200]}",
-                status_code=response.status_code,
-            )
-        return response.content
+        return self._request(url).content
 
     # ------------------------------------------------------------------
     # Stop Finder API
@@ -171,7 +169,7 @@ class TripPlannerClient:
                 "type_sf": "any",
                 "name_sf": query,
                 "anyMaxSizeHitList": max_results if location_type == "any" else max_results * 5,
-                "TfNSWSF": "true" if tfnsw_sf else "false",
+                "TfNSWSF": _bool(tfnsw_sf),
                 "odvSugMacro": 1,
             },
         )
@@ -244,16 +242,14 @@ class TripPlannerClient:
         -------
         list[Journey]
         """
-        dt = _to_sydney(when or datetime.now(tz=_SYDNEY_TZ))
         params: dict[str, Any] = {
             "depArrMacro": "arr" if arrive_by else "dep",
-            "itdDate": dt.strftime("%Y%m%d"),
-            "itdTime": dt.strftime("%H%M"),
+            **_when_params(when),
             "type_origin": origin_type,
             "name_origin": origin_id,
             "type_destination": destination_type,
             "name_destination": destination_id,
-            "TfNSWTR": "true" if realtime else "false",
+            "TfNSWTR": _bool(realtime),
         }
         if wheelchair:
             params["wheelchair"] = "on"
@@ -282,7 +278,7 @@ class TripPlannerClient:
         destination_id : str
             Stop ID of the destination.
         """
-        coord_str = f"{longitude:.6f}:{latitude:.6f}:EPSG:4326"
+        coord_str = Coordinate(latitude=latitude, longitude=longitude).to_api_string()
         return self.plan_trip(
             origin_id=coord_str,
             destination_id=destination_id,
@@ -328,11 +324,9 @@ class TripPlannerClient:
             CyclingProfile.MODERATE: 50,
             CyclingProfile.MORE_DIRECT: 100,
         }
-        dt = _to_sydney(when or datetime.now(tz=_SYDNEY_TZ))
         params: dict[str, Any] = {
             "depArrMacro": "dep",
-            "itdDate": dt.strftime("%Y%m%d"),
-            "itdTime": dt.strftime("%H%M"),
+            **_when_params(when),
             "type_origin": "stop",
             "name_origin": origin_id,
             "type_destination": "stop",
@@ -379,15 +373,13 @@ class TripPlannerClient:
         -------
         list[StopEvent]
         """
-        dt = _to_sydney(when or datetime.now(tz=_SYDNEY_TZ))
         params: dict[str, Any] = {
             "mode": "direct",
             "type_dm": "stop",
             "name_dm": stop_id,
             "depArrMacro": "dep",
-            "itdDate": dt.strftime("%Y%m%d"),
-            "itdTime": dt.strftime("%H%M"),
-            "TfNSWDM": "true" if realtime else "false",
+            **_when_params(when),
+            "TfNSWDM": _bool(realtime),
         }
         if platform_id:
             params["name_dm"] = platform_id
@@ -489,7 +481,7 @@ class TripPlannerClient:
         -------
         list[Location]
         """
-        coord_str = f"{longitude:.6f}:{latitude:.6f}:EPSG:4326"
+        coord_str = Coordinate(latitude=latitude, longitude=longitude).to_api_string()
         params: dict[str, Any] = {
             "coord": coord_str,
             "type_1": type_1,
