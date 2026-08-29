@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.transport.nsw.gov.au/v1/tp/"
 _GTFS_VEHICLEPOS_URL = "https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/"
+_GTFS_VEHICLEPOS_URL_TEMPLATE = "https://api.transport.nsw.gov.au/{version}/gtfs/vehiclepos/"
 _SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 
 _COMMON_PARAMS: dict[str, str] = {
@@ -499,19 +500,33 @@ class TripPlannerClient:
     # ------------------------------------------------------------------
 
     #: Common ``mode`` values for :meth:`vehicle_positions`. Any path accepted
-    #: by the ``/v1/gtfs/vehiclepos/`` endpoint works; region bus feeds take a
+    #: by the ``gtfs/vehiclepos/`` endpoint works; region bus feeds take a
     #: region suffix (e.g. ``"regionbuses/southerntablelands"``).
     VEHICLE_POSITION_MODES: tuple[str, ...] = (
         "buses",
         "ferries/sydneyferries",
         "lightrail/cbdandsoutheast",
+        "lightrail/innerwest",
         "lightrail/newcastle",
         "lightrail/parramatta",
         "metro",
         "nswtrains",
+        "sydneytrains",
     )
 
-    def vehicle_positions(self, mode: str) -> list[VehiclePosition]:
+    #: Feeds TfNSW has superseded with a v2 endpoint. Per the Open Data portal,
+    #: "the real-time feed for Sydney Trains, Metro, and Inner West Light Rail
+    #: has been superseded by version 2". These 404 on v1, so they are requested
+    #: from v2 automatically. ``metro`` is not listed here: it answers on both,
+    #: and defaulting it to v1 keeps existing behaviour unchanged. Pass
+    #: ``version="v2"`` to reach the newer metro feed.
+    VEHICLE_POSITION_V2_MODES: frozenset[str] = frozenset(
+        {"sydneytrains", "lightrail/innerwest"}
+    )
+
+    def vehicle_positions(
+        self, mode: str, *, version: str | None = None
+    ) -> list[VehiclePosition]:
         """
         Fetch live vehicle positions from the GTFS-Realtime feed.
 
@@ -533,6 +548,11 @@ class TripPlannerClient:
             Feed to query, appended to the ``vehiclepos/`` endpoint. See
             ``VEHICLE_POSITION_MODES`` for common values (e.g. ``"buses"``,
             ``"sydneytrains"``, ``"ferries/sydneyferries"``).
+        version : str, optional
+            API version to request, ``"v1"`` or ``"v2"``. Defaults to v2 for the
+            feeds in ``VEHICLE_POSITION_V2_MODES`` and v1 for everything else,
+            which is what the endpoints actually serve. Pass it explicitly to
+            override, e.g. ``version="v2"`` for the newer ``metro`` feed.
 
         Returns
         -------
@@ -546,7 +566,11 @@ class TripPlannerClient:
                 "Install it with: pip install tfnsw-trip-planner[realtime]"
             ) from exc
 
-        raw = self._get_bytes(_GTFS_VEHICLEPOS_URL + mode.strip("/"))
+        feed_path = mode.strip("/")
+        if version is None:
+            version = "v2" if feed_path in self.VEHICLE_POSITION_V2_MODES else "v1"
+        base = _GTFS_VEHICLEPOS_URL_TEMPLATE.format(version=version)
+        raw = self._get_bytes(base + feed_path)
         feed = gtfs_realtime_pb2.FeedMessage()
         try:
             feed.ParseFromString(raw)
