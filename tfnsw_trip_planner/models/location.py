@@ -38,7 +38,15 @@ class Location:
             or props.get("stopId")
             or ""
         )
-        raw_name = props.get("STOP_NAME_WITH_PLACE") or ""
+        # Same top-level-first ordering as the id above: stop_finder returns the
+        # name as data["name"] ("Circular Quay, Sydney"), while the coord API
+        # omits it and supplies STOP_NAME_WITH_PLACE in properties instead.
+        raw_name = (
+            data.get("name")
+            or props.get("STOP_NAME_WITH_PLACE")
+            or data.get("disassembledName")
+            or ""
+        )
 
         # modes: top-level list wins; fall back to STOP_MOT_LIST (e.g. "1,4,5,9")
         raw_modes: list[int] = data.get("modes") or []
