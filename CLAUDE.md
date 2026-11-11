@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A clean, idiomatic Python client for the [Transport for NSW Trip Planning APIs](https://opendata.transport.nsw.gov.au/). Published to PyPI as `tfnsw-trip-planner`. The only hard runtime dependency is `requests`; `gtfs-realtime-bindings` is an optional `realtime` extra.
+A clean, idiomatic Python client for the [Transport for NSW Trip Planning APIs](https://opendata.transport.nsw.gov.au/). Published to PyPI as `tfnsw-trip-planner`. The only hard runtime dependency is `requests` (plus `tzdata` on Windows only, for `zoneinfo`); `gtfs-realtime-bindings` is an optional `realtime` extra.
 
 ## Commands
 
@@ -19,8 +19,8 @@ python -m pytest tests/test_coordinate.py -k "api_string" -v
 # Install for development (with all extras)
 pip install -e ".[dev,realtime]"
 
-# Lint / format / type-check (configured in pyproject.toml)
-black . && isort . && ruff check . && mypy tfnsw_trip_planner
+# Lint / format / type-check (configured in pyproject.toml; CI runs all three)
+ruff check . && ruff format . && mypy tfnsw_trip_planner
 
 # Build + publish (runs pytest first, then twine). test = TestPyPI, prod = PyPI
 ./build_and_publish.sh test
@@ -29,7 +29,7 @@ black . && isort . && ruff check . && mypy tfnsw_trip_planner
 ./build_demo.sh
 ```
 
-Line length is 100 across black/isort/ruff. mypy targets Python 3.9; the library supports 3.9–3.13.
+Line length is 100. ruff does both linting and formatting (black/isort are no longer used). mypy targets Python 3.10; the library supports 3.10–3.15.
 
 ## Architecture
 
@@ -45,7 +45,11 @@ Line length is 100 across black/isort/ruff. mypy targets Python 3.9; the library
 
 **Coordinate format gotcha.** The TfNSW API expects coordinates as `longitude:latitude:EPSG:4326` (lon first). `Coordinate.to_api_string()` and the inline `f"{longitude:.6f}:{latitude:.6f}:EPSG:4326"` strings encode this — don't swap the order.
 
-**Errors.** Network failures raise `NetworkError`; non-2xx or unparseable responses raise `APIError` (with `status_code`). Both subclass `TripPlannerError`.
+**Errors and retries.** `_request()` retries network errors and HTTP 429/502/503/504 with exponential backoff (honouring `Retry-After` up to 30 s). After retries, network failures raise `NetworkError`, a persistent 429 raises `RateLimitError` (an `APIError`), and other non-2xx or unparseable responses raise `APIError` (with `status_code`). All subclass `TripPlannerError`.
+
+**HTTP 200 does not mean success.** The trip-planning endpoints report bad input (invalid stop, invalid date) as `{"type": "error"}` entries in `systemMessages` with an empty result list. `_get(..., result_key=...)` raises those as `APIError` (with `code`) only when that list is empty — `stop_finder` emits an "error" (-8011) alongside good results, and "no route found" is a *warning* (-4000) that must still yield `[]`. Pass `result_key` for `trip` and `departure_mon`; not for `stop_finder`.
+
+**Null-tolerant parsing.** In `from_dict`, read nested objects and lists as `data.get("k") or {}` / `or []`, not `data.get("k", {})` — the API can send keys with `null` values.
 
 ## Versioning
 

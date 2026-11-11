@@ -3,6 +3,7 @@
 TfNSW superseded some feeds with a v2 endpoint; those 404 on v1. These tests
 pin the URL the client builds, without touching the network.
 """
+
 import pytest
 
 from tfnsw_trip_planner.client import TripPlannerClient
@@ -47,7 +48,9 @@ class TestVehiclePositionApiVersion:
     def test_v1_feeds_use_v1(self, client, session, mode):
         client.vehicle_positions(mode)
 
-        assert session.requested_url == f"https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/{mode}"
+        assert (
+            session.requested_url == f"https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/{mode}"
+        )
 
     @pytest.mark.parametrize("mode", ["sydneytrains", "lightrail/innerwest"])
     def test_superseded_feeds_use_v2(self, client, session, mode):
@@ -55,7 +58,9 @@ class TestVehiclePositionApiVersion:
         # unreachable through this library entirely.
         client.vehicle_positions(mode)
 
-        assert session.requested_url == f"https://api.transport.nsw.gov.au/v2/gtfs/vehiclepos/{mode}"
+        assert (
+            session.requested_url == f"https://api.transport.nsw.gov.au/v2/gtfs/vehiclepos/{mode}"
+        )
 
     def test_explicit_version_overrides_the_default(self, client, session):
         # metro answers on both; v1 is the default only for compatibility.

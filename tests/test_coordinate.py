@@ -1,5 +1,5 @@
 """Unit tests for the Coordinate model."""
-import pytest
+
 from tfnsw_trip_planner.models.coordinate import Coordinate
 
 

@@ -1,4 +1,5 @@
 """Leg model."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from .travel_in_cars import TravelInCars
 @dataclass
 class Leg:
     """A single leg of a journey."""
+
     duration: int  # seconds
     origin: Stop
     destination: Stop
@@ -28,23 +30,23 @@ class Leg:
     is_realtime: bool
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Leg":
-        origin = Stop.from_dict(data.get("origin", {}))
-        destination = Stop.from_dict(data.get("destination", {}))
-        transport = Transport.from_dict(data.get("transportation", {}))
+    def from_dict(cls, data: dict) -> Leg:
+        origin = Stop.from_dict(data.get("origin") or {})
+        destination = Stop.from_dict(data.get("destination") or {})
+        transport = Transport.from_dict(data.get("transportation") or {})
 
-        stop_seq = [Stop.from_dict(s) for s in data.get("stopSequence", [])]
-        raw_coords = data.get("coords", [])
+        stop_seq = [Stop.from_dict(s) for s in data.get("stopSequence") or []]
+        raw_coords = data.get("coords") or []
         coords = [c for item in raw_coords if (c := Coordinate.from_list(item))]
 
-        infos = [ServiceAlert.from_dict(a) for a in data.get("infos", [])]
-        hints = [Hint.from_dict(h) for h in data.get("hints", [])]
+        infos = [ServiceAlert.from_dict(a) for a in data.get("infos") or []]
+        hints = [Hint.from_dict(h) for h in data.get("hints") or []]
 
-        props = data.get("properties", {})
+        props = data.get("properties") or {}
         is_rt = bool(origin.departure_estimated or destination.arrival_estimated)
 
         return cls(
-            duration=data.get("duration", 0),
+            duration=data.get("duration") or 0,
             origin=origin,
             destination=destination,
             transportation=transport,

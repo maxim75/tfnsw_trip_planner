@@ -5,6 +5,7 @@ merged PR and uploads with ``skip-existing``, so a merge that forgets the bump
 publishes nothing at all. That makes the version string load-bearing, and it
 lives in both pyproject.toml and __init__.py.
 """
+
 import re
 from pathlib import Path
 

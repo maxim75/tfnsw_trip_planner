@@ -1,4 +1,5 @@
 """Location model."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from .stop_parent import StopParent
 @dataclass
 class Location:
     """A location returned by the Stop Finder or Coordinate API."""
+
     id: str
     name: str
     type: LocationType
@@ -26,18 +28,13 @@ class Location:
     distance: int | None
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Location":
+    def from_dict(cls, data: dict) -> Location:
         coord_raw = data.get("coord")
         parent_raw = data.get("parent")
-        props = data.get("properties", {})
+        props = data.get("properties") or {}
 
         # The coord API returns sparse top-level fields; fall back to properties.
-        raw_id = str(
-            data.get("id")
-            or props.get("STOP_GLOBAL_ID")
-            or props.get("stopId")
-            or ""
-        )
+        raw_id = str(data.get("id") or props.get("STOP_GLOBAL_ID") or props.get("stopId") or "")
         # Same top-level-first ordering as the id above: stop_finder returns the
         # name as data["name"] ("Circular Quay, Sydney"), while the coord API
         # omits it and supplies STOP_NAME_WITH_PLACE in properties instead.
@@ -68,11 +65,12 @@ class Location:
             id=raw_id,
             name=raw_name,
             type=LocationType(data.get("type", "unknown"))
-                if data.get("type") in LocationType._value2member_map_ else LocationType.UNKNOWN,
+            if data.get("type") in LocationType._value2member_map_
+            else LocationType.UNKNOWN,
             coord=Coordinate.from_list(coord_raw) if coord_raw else None,
             modes=raw_modes,
-            match_quality=data.get("matchQuality", 0),
-            is_best=data.get("isBest", False),
+            match_quality=data.get("matchQuality") or 0,
+            is_best=bool(data.get("isBest")),
             parent=StopParent.from_dict(parent_raw) if parent_raw else None,
             building_number=data.get("buildingNumber", ""),
             street_name=data.get("streetName", ""),

@@ -4,7 +4,7 @@ A hands-on walkthrough of every major feature in the [`tfnsw-trip-planner`](http
 
 **Requirements**
 - A Transport for NSW Open Data API key stored in a `.env` file as `TRANSPORT_NSW_API_KEY=<your_key>`.
-- Python 3.9+
+- Python 3.10+
 
 **Exporting to Markdown**
 
@@ -37,7 +37,9 @@ from tfnsw_trip_planner import CyclingProfile, TransportMode, TripPlannerClient
 
 _SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 
-tomorrow_9am = datetime.datetime.now(tz=_SYDNEY_TZ).replace(hour=9, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
+tomorrow_9am = datetime.datetime.now(tz=_SYDNEY_TZ).replace(
+    hour=9, minute=0, second=0, microsecond=0
+) + datetime.timedelta(days=1)
 ```
 
 ## 2 · Initialize the Client
@@ -73,7 +75,9 @@ locations = client.find_stop("Circular Quay", location_type="stop", max_results=
 
 print(f"Found {len(locations)} stop(s):\n")
 for loc in locations:
-    modes = ", ".join(TransportMode.from_class(m).name.title() for m in loc.modes) if loc.modes else "—"
+    modes = (
+        ", ".join(TransportMode.from_class(m).name.title() for m in loc.modes) if loc.modes else "—"
+    )
     print(f"  {loc.name}")
     print(f"    ID    : {loc.id}")
     print(f"    Coord : {loc.coord}")
@@ -126,12 +130,14 @@ for query in ["Central Station", "Domestic Airport", "Manly Wharf", "Bondi Junct
 # Domestic Airport Station (stop 2233133), 09:00 on a weekday
 departures = client.get_departures("200020", when=tomorrow_9am)
 
-print(f"Next {min(10, len(departures))} departures from Domestic Airport at {tomorrow_9am:%H:%M %d/%m/%Y}:\n")
+print(
+    f"Next {min(10, len(departures))} departures from Domestic Airport at {tomorrow_9am:%H:%M %d/%m/%Y}:\n"
+)
 for event in departures[:10]:
-    rt    = "⚡" if event.is_realtime else "🕐"
-    mins  = event.minutes_until_departure
-    svc   = event.transportation.number or "—"
-    dest  = event.transportation.destination_name or "—"
+    rt = "⚡" if event.is_realtime else "🕐"
+    mins = event.minutes_until_departure
+    svc = event.transportation.number or "—"
+    dest = event.transportation.destination_name or "—"
     dep_t = event.departure_time
     print(f"  {rt}  {mins:>4}m   {dep_t:%H:%M}   {svc:>8}   → {dest}")
 ```
@@ -168,13 +174,13 @@ def print_journeys(journeys):
         print(f"  Route  : {journey.summary}")
         print()
         for leg in journey.legs:
-            route    = leg.transportation.number or leg.mode.name.title()
-            dest     = leg.transportation.destination_name or "—"
-            dep_t    = leg.origin.departure_time
-            arr_t    = leg.destination.arrival_time
-            plat     = leg.origin.properties.get("platform") or ""
+            route = leg.transportation.number or leg.mode.name.title()
+            dest = leg.transportation.destination_name or "—"
+            dep_t = leg.origin.departure_time
+            arr_t = leg.destination.arrival_time
+            plat = leg.origin.properties.get("platform") or ""
             plat_str = f"  Platform {plat}" if plat else ""
-            rt       = "⚡" if leg.is_realtime else "  "
+            rt = "⚡" if leg.is_realtime else "  "
             print(f"    {rt} {leg.mode.name:<12} {route:<10}  → {dest}")
             print(f"         From : {leg.origin.name}{plat_str}")
             print(f"         Dep  : {dep_t:%H:%M}" if dep_t else "         Dep  : —")
@@ -184,8 +190,8 @@ def print_journeys(journeys):
 
 
 journeys = client.plan_trip(
-    origin_id="223310",   # Engadine Station
-    destination_id="200070", # Town Hall Station
+    origin_id="223310",  # Engadine Station
+    destination_id="200070",  # Town Hall Station
     when=tomorrow_9am,
 )
 print(f"Depart-by trip · Domestic Airport → Manly Wharf · Dep {tomorrow_9am:%H:%M}\n")
@@ -247,7 +253,7 @@ Set `arrive_by=True` to find journeys that arrive at the destination *by* a spec
 
 ```python
 journeys = client.plan_trip(
-    origin_id="223310",   # Engadine Station
+    origin_id="223310",  # Engadine Station
     destination_id="200070",  # Town Hall Station
     arrive_by=True,
     when=tomorrow_9am,
@@ -433,8 +439,8 @@ The `CyclingProfile` enum controls route preference: `EASIER`, `MODERATE`, or `M
 ```python
 when = datetime.datetime(2026, 2, 27, 9, 0, tzinfo=_SYDNEY_TZ)
 journeys = client.plan_cycling_trip(
-    origin_id="10101331",      # Circular Quay Station
-    destination_id="10102027", # Manly Wharf
+    origin_id="10101331",  # Circular Quay Station
+    destination_id="10102027",  # Manly Wharf
     profile=CyclingProfile.MODERATE,
     when=when,
 )
@@ -473,9 +479,11 @@ alerts = client.get_alerts()
 if alerts:
     print(f"{len(alerts)} current alert(s):\n")
     for alert in alerts[:5]:
-        modified = alert.last_modification.strftime("%d/%m/%Y %H:%M") if alert.last_modification else "—"
-        stops    = len(alert.affected_stops)
-        lines    = len(alert.affected_lines)
+        modified = (
+            alert.last_modification.strftime("%d/%m/%Y %H:%M") if alert.last_modification else "—"
+        )
+        stops = len(alert.affected_stops)
+        lines = len(alert.affected_lines)
         print(f"  {alert.subtitle}")
         print(f"    Last updated : {modified}")
         print(f"    Affects      : {stops} stop(s), {lines} line(s)")
@@ -527,7 +535,9 @@ lat, lon = -33.8568, 151.2153
 nearby = client.find_nearby(lat, lon, radius_m=1000, type_1="STOP")
 print(f"Nearby transport stops within 300 m of Sydney Opera House ({lat}, {lon}):\n")
 for loc in nearby[:8]:
-    modes = ", ".join(TransportMode.from_class(m).name.title() for m in loc.modes) if loc.modes else "—"
+    modes = (
+        ", ".join(TransportMode.from_class(m).name.title() for m in loc.modes) if loc.modes else "—"
+    )
     coord = str(loc.coord) if loc.coord else "—"
     print(f"  {loc.name}")
     print(f"    ID       : {loc.id}")

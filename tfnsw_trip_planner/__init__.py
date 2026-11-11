@@ -1,18 +1,38 @@
 """TfNSW Trip Planner API - Python Client Library"""
+
 from .client import TripPlannerClient
+from .exceptions import APIError, NetworkError, RateLimitError, TripPlannerError
 from .models import (
-    Location, Journey, Leg, StopEvent, ServiceAlert,
-    Stop, Transport, Coordinate, CyclingProfile, TransportMode,
-    VehiclePosition
+    Coordinate,
+    CyclingProfile,
+    Journey,
+    Leg,
+    Location,
+    ServiceAlert,
+    Stop,
+    StopEvent,
+    Transport,
+    TransportMode,
+    VehiclePosition,
 )
-from .exceptions import TripPlannerError, APIError, NetworkError
 
 __all__ = [
     "TripPlannerClient",
-    "Location", "Journey", "Leg", "StopEvent", "ServiceAlert",
-    "Stop", "Transport", "Coordinate", "CyclingProfile", "TransportMode",
+    "Location",
+    "Journey",
+    "Leg",
+    "StopEvent",
+    "ServiceAlert",
+    "Stop",
+    "Transport",
+    "Coordinate",
+    "CyclingProfile",
+    "TransportMode",
     "VehiclePosition",
-    "TripPlannerError", "APIError", "NetworkError",
+    "TripPlannerError",
+    "APIError",
+    "RateLimitError",
+    "NetworkError",
 ]
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"

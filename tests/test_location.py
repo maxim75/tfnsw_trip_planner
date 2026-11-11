@@ -1,7 +1,7 @@
 """Unit tests for the Location model."""
+
 from tfnsw_trip_planner.models.enums import LocationType
 from tfnsw_trip_planner.models.location import Location
-
 
 # A trimmed but faithful stop_finder response entry. The name is carried at the
 # top level here; there is no "properties" key at all.

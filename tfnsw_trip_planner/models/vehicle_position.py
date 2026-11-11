@@ -1,4 +1,5 @@
 """VehiclePosition model (GTFS-Realtime Vehicle Positions feed)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ class VehiclePosition:
     Unlike the Trip Planner endpoints (which return real-time *timing*), this
     is the live GPS location reported by the vehicle itself.
     """
+
     vehicle_id: str | None
     trip_id: str | None
     route_id: str | None
@@ -28,7 +30,7 @@ class VehiclePosition:
     timestamp: datetime | None
 
     @classmethod
-    def from_entity(cls, entity: Any) -> "VehiclePosition | None":
+    def from_entity(cls, entity: Any) -> VehiclePosition | None:
         """Build from a GTFS-Realtime ``FeedEntity`` protobuf message.
 
         Returns ``None`` for entities that carry no vehicle position.

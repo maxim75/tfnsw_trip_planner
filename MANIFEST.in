@@ -2,3 +2,4 @@ include README.md
 include LICENSE
 include DEPLOYMENT.md
 recursive-include tfnsw_trip_planner *.py
+include tfnsw_trip_planner/py.typed

@@ -1,4 +1,5 @@
 """StopParent model."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,7 +12,7 @@ class StopParent:
     type: str
 
     @classmethod
-    def from_dict(cls, data: dict) -> "StopParent":
+    def from_dict(cls, data: dict) -> StopParent:
         return cls(
             id=data.get("id", ""),
             name=data.get("name", ""),

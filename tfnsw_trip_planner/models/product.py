@@ -1,4 +1,5 @@
 """Product model."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,7 +12,7 @@ class Product:
     icon_id: int
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Product":
+    def from_dict(cls, data: dict) -> Product:
         return cls(
             product_class=data.get("class", -1),
             name=data.get("name", ""),

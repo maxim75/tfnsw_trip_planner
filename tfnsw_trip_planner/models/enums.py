@@ -1,4 +1,5 @@
 """Transport-related enumerations."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -6,6 +7,7 @@ from enum import Enum
 
 class TransportMode(Enum):
     TRAIN = 1
+    METRO = 2
     LIGHT_RAIL = 4
     BUS = 5
     COACH = 7
@@ -18,7 +20,7 @@ class TransportMode(Enum):
     UNKNOWN = -1
 
     @classmethod
-    def from_class(cls, product_class: int) -> "TransportMode":
+    def from_class(cls, product_class: int) -> TransportMode:
         try:
             return cls(product_class)
         except ValueError:

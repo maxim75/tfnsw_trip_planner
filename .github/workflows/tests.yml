@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
 
     steps:
       - uses: actions/checkout@v7
@@ -31,5 +31,54 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,realtime]"
 
+      # Live integration tests skip themselves without TFNSW_API_KEY.
       - name: Run tests
-        run: python -m pytest tests/ -v
+        run: python -m pytest tests/ -v --cov=tfnsw_trip_planner --cov-report=term-missing
+
+  lint:
+    name: Lint and type-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+          cache: pip
+
+      - name: Install package with dev + realtime extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,realtime]"
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: ruff format
+        run: ruff format --check .
+
+      - name: mypy
+        run: mypy tfnsw_trip_planner
+
+  build:
+    name: Build and validate package
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          twine check --strict dist/*
+
+      - name: Wheel ships the py.typed marker
+        run: unzip -l dist/*.whl | grep -q 'tfnsw_trip_planner/py.typed'
