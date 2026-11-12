@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # Required for PyPI Trusted Publisher (OIDC)
 
 jobs:
   build:
@@ -31,7 +30,7 @@ jobs:
         run: python -m build
 
       - name: Validate package
-        run: twine check dist/*
+        run: twine check --strict dist/*
 
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v7
@@ -47,16 +46,18 @@ jobs:
     environment:
       name: pypi
       url: https://pypi.org/p/tfnsw-trip-planner
+    permissions:
+      id-token: write  # Required for PyPI Trusted Publisher (OIDC); scoped to this job only.
 
     steps:
       - name: Download distribution artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: python-package-distributions
           path: dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.14.3
         with:
           # Merges that don't bump the version are a no-op rather than a failure.
           skip-existing: true

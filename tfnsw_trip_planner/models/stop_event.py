@@ -1,4 +1,5 @@
 """StopEvent model."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -25,6 +26,7 @@ def _parse_dt(s: str | None) -> datetime | None:
 @dataclass
 class StopEvent:
     """A single departure event from the Departure API."""
+
     location: Stop
     transportation: Transport
     departure_planned: datetime | None
@@ -32,13 +34,13 @@ class StopEvent:
     onwards_locations: list[dict]
 
     @classmethod
-    def from_dict(cls, data: dict) -> "StopEvent":
+    def from_dict(cls, data: dict) -> StopEvent:
         return cls(
-            location=Stop.from_dict(data.get("location", {})),
-            transportation=Transport.from_dict(data.get("transportation", {})),
+            location=Stop.from_dict(data.get("location") or {}),
+            transportation=Transport.from_dict(data.get("transportation") or {}),
             departure_planned=_parse_dt(data.get("departureTimePlanned")),
             departure_estimated=_parse_dt(data.get("departureTimeEstimated")),
-            onwards_locations=data.get("onwardLocations", []),
+            onwards_locations=data.get("onwardLocations") or [],
         )
 
     @property
@@ -59,7 +61,7 @@ class StopEvent:
     def travel_in_cars(self) -> list[TravelInCars]:
         result = []
         for loc in self.onwards_locations:
-            tic = TravelInCars.from_properties(loc.get("properties", {}))
+            tic = TravelInCars.from_properties(loc.get("properties") or {})
             if tic:
                 result.append(tic)
         return result

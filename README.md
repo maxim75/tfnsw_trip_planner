@@ -7,10 +7,13 @@ A clean, idiomatic Python library for the [Transport for NSW Trip Planning APIs]
 ## Installation
 
 ```bash
-pip install requests          # only external dependency
+pip install tfnsw-trip-planner
+# with live vehicle positions (GTFS-Realtime):
+pip install "tfnsw-trip-planner[realtime]"
 ```
 
-Copy the `tfnsw_trip_planner/` package into your project, then import it:
+Requires Python 3.10 or newer. The only runtime dependency is `requests`
+(plus `tzdata` on Windows, which has no system timezone database).
 
 ```python
 from tfnsw_trip_planner import TripPlannerClient
@@ -38,6 +41,7 @@ Avoid hard-coding the key in source — read it from the environment instead:
 
 ```python
 import os
+
 client = TripPlannerClient(api_key=os.environ["TFNSW_API_KEY"])
 ```
 
@@ -75,7 +79,7 @@ print(best.id, best.name)
 from datetime import datetime
 
 journeys = client.plan_trip(
-    origin_id="10101331",       # Domestic Airport Station
+    origin_id="10101331",  # Domestic Airport Station
     destination_id="10102027",  # Manly Wharf
 )
 
@@ -86,11 +90,12 @@ for journey in journeys:
     print(f"  Depart : {journey.departure_time}")
     print(f"  Arrive : {journey.arrival_time}")
     print(f"  Route  : {journey.summary}")
-
-    fare = journey.fare_summary
-    if fare:
-        print(f"  Cost   : ${fare.price_total:.2f} ({fare.status.value})")
+    print(f"  Takes  : {journey.total_duration // 60} min (including transfer waits)")
 ```
+
+`plan_trip` returns an empty list when no route exists, and raises `APIError`
+when the API rejects the request (an invalid stop ID or date, or an origin too
+close to the destination).
 
 ### 3. Arrive By a Specific Time
 
@@ -155,8 +160,10 @@ departures = client.get_departures("10101331")  # Domestic Airport
 
 for event in departures:
     mins = event.minutes_until_departure
-    rt   = "⚡" if event.is_realtime else "🕐"
-    print(f"{rt} {mins:>3}m  {event.transportation.number:>8}  → {event.transportation.destination_name}")
+    rt = "⚡" if event.is_realtime else "🕐"
+    print(
+        f"{rt} {mins:>3}m  {event.transportation.number:>8}  → {event.transportation.destination_name}"
+    )
 
 # From a specific platform only
 departures = client.get_departures("10101331", platform_id="202091")
@@ -195,8 +202,10 @@ nearby = client.find_nearby(latitude=-33.884080, longitude=151.206290, radius_m=
 for loc in nearby:
     print(loc.name, loc.properties.get("distance"), "m")
 
-# Opal resellers within 1km
-resellers = client.find_opal_resellers(latitude=-33.884080, longitude=151.206290)
+# Opal resellers within 1km (draw class 74)
+resellers = client.find_nearby(
+    latitude=-33.884080, longitude=151.206290, radius_m=1000, draw_class=74
+)
 for r in resellers:
     print(r.name, r.coord)
 ```
@@ -220,9 +229,11 @@ pip install tfnsw-trip-planner[realtime]
 buses = client.vehicle_positions("buses")
 
 for v in buses[:5]:
-    print(f"{v.vehicle_id}  route={v.route_id}  "
-          f"{v.latitude:.5f},{v.longitude:.5f}  "
-          f"bearing={v.bearing}  @ {v.timestamp}")
+    print(
+        f"{v.vehicle_id}  route={v.route_id}  "
+        f"{v.latitude:.5f},{v.longitude:.5f}  "
+        f"bearing={v.bearing}  @ {v.timestamp}"
+    )
 
 # Other feeds: "nswtrains", "metro", "ferries/sydneyferries",
 #              "lightrail/cbdandsoutheast", "lightrail/newcastle", ...
@@ -267,20 +278,20 @@ with TripPlannerClient(api_key="YOUR_KEY") as client:
 | `get_departures(stop_id, ...)` | Upcoming departures from a stop |
 | `get_alerts(...)` | Service alerts |
 | `find_nearby(lat, lon, ...)` | POIs near a coordinate |
-| `find_opal_resellers(lat, lon, ...)` | Opal resellers near a coordinate |
-| `vehicle_positions(mode)` | Live vehicle GPS positions (GTFS-Realtime) |
+| `vehicle_positions(mode, version=None)` | Live vehicle GPS positions (GTFS-Realtime) |
+
+Constructor: `TripPlannerClient(api_key, timeout=30, session=None, *, max_retries=2, backoff_factor=0.5)`.
 
 ### Key Models
 
 | Model | Key Attributes |
 |---|---|
 | `Location` | `id`, `name`, `type`, `coord`, `modes`, `is_best` |
-| `Journey` | `legs`, `departure_time`, `arrival_time`, `total_duration`, `summary`, `fare_summary` |
+| `Journey` | `legs`, `departure_time`, `arrival_time`, `total_duration` (seconds, door-to-door), `summary` |
 | `Leg` | `mode`, `origin`, `destination`, `duration`, `stop_sequence`, `coords`, `infos` |
 | `Stop` | `id`, `name`, `departure_time`, `arrival_time`, `wheelchair_access` |
 | `Transport` | `number`, `mode`, `destination_name` |
 | `StopEvent` | `transportation`, `departure_time`, `is_realtime`, `minutes_until_departure` |
-| `Fare` | `person`, `price_total`, `station_access_fee`, `status` |
 | `ServiceAlert` | `subtitle`, `url`, `affected_stops`, `affected_lines` |
 | `TravelInCars` | `number_of_cars`, `from_car`, `to_car`, `message` |
 | `VehiclePosition` | `vehicle_id`, `route_id`, `trip_id`, `latitude`, `longitude`, `bearing`, `speed`, `timestamp`, `coord` |
@@ -295,19 +306,33 @@ with TripPlannerClient(api_key="YOUR_KEY") as client:
 
 ### `TransportMode` Enum
 
-`TRAIN`, `LIGHT_RAIL`, `BUS`, `COACH`, `FERRY`, `SCHOOL_BUS`, `WALK`, `CYCLE`, `ON_DEMAND`
+`TRAIN`, `METRO`, `LIGHT_RAIL`, `BUS`, `COACH`, `FERRY`, `SCHOOL_BUS`, `WALK`, `WALK_ALT`, `CYCLE`, `ON_DEMAND`, `UNKNOWN`
 
 ---
 
 ## Error Handling
 
 ```python
-from tfnsw_trip_planner import APIError, NetworkError
+from tfnsw_trip_planner import APIError, NetworkError, RateLimitError
 
 try:
     journeys = client.plan_trip("10101331", "10102027")
 except NetworkError as e:
     print("Network problem:", e)
+except RateLimitError as e:
+    print("Rate limited; retry after", e.retry_after, "s")
 except APIError as e:
-    print(f"API error {e.status_code}:", e)
+    print(f"API error {e.status_code} (code {e.code}):", e)
 ```
+
+All exceptions subclass `TripPlannerError`.
+
+| Exception | Raised when |
+|---|---|
+| `NetworkError` | Connection failure, timeout or broken response, after retries |
+| `RateLimitError` | HTTP 429 persists after retries, or `Retry-After` is over 30 s |
+| `APIError` | Any other non-2xx status, an unparseable body, or an API-reported error such as an invalid stop (then `status_code` is 200 and `code` holds the API's error code) |
+
+Network errors, HTTP 429 and 502/503/504 are retried with exponential backoff
+(`backoff_factor * 2 ** attempt`, honouring `Retry-After`). Set `max_retries=0`
+to disable this.

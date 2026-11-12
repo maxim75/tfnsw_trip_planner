@@ -1,4 +1,5 @@
 """Hint model."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,5 +11,5 @@ class Hint:
     raw: dict
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Hint":
+    def from_dict(cls, data: dict) -> Hint:
         return cls(text=data.get("infoText", ""), raw=data)

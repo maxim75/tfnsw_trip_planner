@@ -1,4 +1,5 @@
 """Transport model."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,12 +21,12 @@ class Transport:
     mode: TransportMode
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Transport":
+    def from_dict(cls, data: dict) -> Transport:
         product_raw = data.get("product")
         product = Product.from_dict(product_raw) if product_raw else None
         mode = TransportMode.from_class(product.product_class) if product else TransportMode.UNKNOWN
 
-        dest = data.get("destination", {})
+        dest = data.get("destination") or {}
         return cls(
             id=data.get("id", ""),
             name=data.get("name", ""),
@@ -39,4 +40,6 @@ class Transport:
         )
 
     def __repr__(self) -> str:
-        return f"Transport(number={self.number!r}, mode={self.mode}, dest={self.destination_name!r})"
+        return (
+            f"Transport(number={self.number!r}, mode={self.mode}, dest={self.destination_name!r})"
+        )

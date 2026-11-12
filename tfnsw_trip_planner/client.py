@@ -1,8 +1,11 @@
 """Main HTTP client for the TfNSW Trip Planner APIs."""
+
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
@@ -10,7 +13,7 @@ from zoneinfo import ZoneInfo
 import requests
 from requests import Response, Session
 
-from .exceptions import APIError, NetworkError
+from .exceptions import APIError, NetworkError, RateLimitError
 from .models import (
     Coordinate,
     CyclingProfile,
@@ -24,7 +27,6 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.transport.nsw.gov.au/v1/tp/"
-_GTFS_VEHICLEPOS_URL = "https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/"
 _GTFS_VEHICLEPOS_URL_TEMPLATE = "https://api.transport.nsw.gov.au/{version}/gtfs/vehiclepos/"
 _SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 
@@ -32,6 +34,12 @@ _COMMON_PARAMS: dict[str, str] = {
     "outputFormat": "rapidJSON",
     "coordOutputFormat": "EPSG:4326",
 }
+
+#: HTTP statuses worth retrying: rate limiting and transient gateway errors.
+_RETRY_STATUSES = frozenset({429, 502, 503, 504})
+#: Longest ``Retry-After`` the client will sleep for. A longer one (e.g. a
+#: daily quota reset) is raised straight away rather than blocking the caller.
+_MAX_RETRY_AFTER = 30.0
 
 
 def _to_sydney(dt: datetime) -> datetime:
@@ -56,6 +64,52 @@ def _bool(value: bool) -> str:
     return "true" if value else "false"
 
 
+def _retry_after(response: Response) -> float | None:
+    """Parse a ``Retry-After`` header (delta-seconds or HTTP-date) into seconds."""
+    value = response.headers.get("Retry-After")
+    if not value:
+        return None
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        pass
+    try:
+        when = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, (when - datetime.now(tz=when.tzinfo)).total_seconds())
+
+
+def _network_error(exc: requests.RequestException, timeout: float) -> NetworkError:
+    if isinstance(exc, requests.Timeout):
+        return NetworkError(f"Request timed out after {timeout}s")
+    if isinstance(exc, requests.ConnectionError):
+        return NetworkError(f"Connection error: {exc}")
+    return NetworkError(f"Request failed: {exc}")
+
+
+def _raise_for_system_errors(data: dict[str, Any], status_code: int) -> None:
+    """Raise :class:`APIError` if the body carries ``systemMessages`` errors.
+
+    The trip-planning endpoints answer HTTP 200 even for invalid input and
+    report the problem as ``{"type": "error", ...}`` system messages. Only call
+    this when the expected result list is empty: the API also emits "error"
+    messages alongside perfectly good results. "No route found" is a warning,
+    not an error, so it still yields an empty list rather than an exception.
+    """
+    messages = data.get("systemMessages") or []
+    errors = [m for m in messages if isinstance(m, dict) and m.get("type") == "error"]
+    if not errors:
+        return
+    text = "; ".join(str(m.get("text") or f"code {m.get('code')}") for m in errors)
+    code = errors[0].get("code")
+    raise APIError(
+        f"API error: {text}",
+        status_code=status_code,
+        code=code if isinstance(code, int) else None,
+    )
+
+
 class TripPlannerClient:
     """
     Python client for the Transport for NSW Trip Planning APIs.
@@ -66,15 +120,23 @@ class TripPlannerClient:
       - departure_mon : List upcoming departures from a stop.
       - add_info      : Retrieve service alerts.
       - coord         : Find nearby stops / POIs by coordinate.
+      - gtfs/vehiclepos : Live vehicle positions (GTFS-Realtime).
 
     Parameters
     ----------
     api_key : str
         Your TfNSW Open Data API key (passed as the ``Authorization`` header).
-    timeout : int
+    timeout : float
         HTTP request timeout in seconds (default 30).
     session : requests.Session, optional
         Inject a custom ``requests.Session`` (useful for testing).
+    max_retries : int
+        How many times to retry a request that failed with a network error,
+        HTTP 429 or a 502/503/504 (default 2). ``0`` disables retries.
+    backoff_factor : float
+        Base delay in seconds for exponential backoff between retries
+        (``backoff_factor * 2 ** attempt``; default 0.5). A ``Retry-After``
+        header from the server takes precedence.
 
     Example
     -------
@@ -89,11 +151,18 @@ class TripPlannerClient:
     def __init__(
         self,
         api_key: str,
-        timeout: int = 30,
+        timeout: float = 30,
         session: Session | None = None,
+        *,
+        max_retries: int = 2,
+        backoff_factor: float = 0.5,
     ) -> None:
+        if max_retries < 0:
+            raise ValueError("max_retries must be >= 0")
         self.api_key = api_key
         self.timeout = timeout
+        self.max_retries = max_retries
+        self.backoff_factor = backoff_factor
         self._session = session or requests.Session()
         self._session.headers.update({"Authorization": f"apikey {api_key}"})
 
@@ -102,29 +171,66 @@ class TripPlannerClient:
     # ------------------------------------------------------------------
 
     def _request(self, url: str, params: dict[str, Any] | None = None) -> Response:
-        """GET *url*, raising on connection/timeout/non-2xx responses."""
+        """GET *url* with retries, raising on network errors and non-2xx responses."""
         logger.debug("GET %s?%s", url, urlencode(params or {}))
-        try:
-            response = self._session.get(url, params=params, timeout=self.timeout)
-        except requests.ConnectionError as exc:
-            raise NetworkError(f"Connection error: {exc}") from exc
-        except requests.Timeout as exc:
-            raise NetworkError(f"Request timed out after {self.timeout}s") from exc
+        for attempt in range(self.max_retries + 1):
+            final = attempt == self.max_retries
+            backoff = self.backoff_factor * (2**attempt)
+            try:
+                response = self._session.get(url, params=params, timeout=self.timeout)
+            except requests.RequestException as exc:
+                if final:
+                    raise _network_error(exc, self.timeout) from exc
+                logger.debug("Retrying %s after %s (attempt %d)", url, exc, attempt + 1)
+                time.sleep(backoff)
+                continue
 
-        if not response.ok:
-            raise APIError(
-                f"API error {response.status_code}: {response.text[:200]}",
-                status_code=response.status_code,
-            )
-        return response
+            if response.status_code in _RETRY_STATUSES and not final:
+                retry_after = _retry_after(response)
+                delay = backoff if retry_after is None else retry_after
+                if delay <= _MAX_RETRY_AFTER:
+                    logger.debug(
+                        "Retrying %s after HTTP %d in %.1fs", url, response.status_code, delay
+                    )
+                    time.sleep(delay)
+                    continue
 
-    def _get(self, endpoint: str, params: dict[str, Any]) -> dict:
-        """Perform a GET request against a trip-planning endpoint and return parsed JSON."""
+            if response.status_code == 429:
+                raise RateLimitError(
+                    f"Rate limit or quota exceeded: {response.text[:200]}",
+                    retry_after=_retry_after(response),
+                )
+            if not response.ok:
+                raise APIError(
+                    f"API error {response.status_code}: {response.text[:200]}",
+                    status_code=response.status_code,
+                )
+            return response
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    def _get(
+        self, endpoint: str, params: dict[str, Any], *, result_key: str | None = None
+    ) -> dict[str, Any]:
+        """GET a trip-planning endpoint and return its parsed JSON object.
+
+        If *result_key* is given and that list is empty or missing, any
+        ``systemMessages`` errors in the body are raised as :class:`APIError`.
+        """
         response = self._request(_BASE_URL + endpoint, {**_COMMON_PARAMS, **params})
         try:
-            return response.json()
+            data = response.json()
         except ValueError as exc:
-            raise APIError(f"Invalid JSON response: {exc}") from exc
+            raise APIError(
+                f"Invalid JSON response: {exc}", status_code=response.status_code
+            ) from exc
+        if not isinstance(data, dict):
+            raise APIError(
+                f"Unexpected response: expected a JSON object, got {type(data).__name__}",
+                status_code=response.status_code,
+            )
+        if result_key is not None and not data.get(result_key):
+            _raise_for_system_errors(data, response.status_code)
+        return data
 
     def _get_bytes(self, url: str) -> bytes:
         """Perform a GET request and return the raw response body."""
@@ -164,6 +270,8 @@ class TripPlannerClient:
         """
         # Always query with type_sf=any — the API silently returns zero results
         # when a specific type is passed for free-text queries. Filter client-side.
+        # No result_key here: stop_finder emits an "error" (-8011) system
+        # message even on successful searches.
         data = self._get(
             "stop_finder",
             {
@@ -174,10 +282,10 @@ class TripPlannerClient:
                 "odvSugMacro": 1,
             },
         )
-        locations = [Location.from_dict(loc) for loc in data.get("locations", [])]
+        locations = [Location.from_dict(loc) for loc in data.get("locations") or []]
         if location_type != "any":
-            locations = [l for l in locations if l.type.value == location_type]
-        return sorted(locations, key=lambda l: l.match_quality, reverse=True)[:max_results]
+            locations = [loc for loc in locations if loc.type.value == location_type]
+        return sorted(locations, key=lambda loc: loc.match_quality, reverse=True)[:max_results]
 
     def find_stop_by_id(self, stop_id: str) -> Location | None:
         """
@@ -242,6 +350,13 @@ class TripPlannerClient:
         Returns
         -------
         list[Journey]
+            Empty if no route was found.
+
+        Raises
+        ------
+        APIError
+            If the API rejects the request, e.g. an invalid stop ID or date,
+            or an origin too close to the destination.
         """
         params: dict[str, Any] = {
             "depArrMacro": "arr" if arrive_by else "dep",
@@ -255,8 +370,8 @@ class TripPlannerClient:
         if wheelchair:
             params["wheelchair"] = "on"
 
-        data = self._get("trip", params)
-        return [Journey.from_dict(j) for j in data.get("journeys", [])]
+        data = self._get("trip", params, result_key="journeys")
+        return [Journey.from_dict(j) for j in data.get("journeys") or []]
 
     def plan_trip_from_coordinate(
         self,
@@ -341,8 +456,8 @@ class TripPlannerClient:
             "bikeProfSpeed": profile.value,
             "elevFac": elev_fac_map[profile],
         }
-        data = self._get("trip", params)
-        return [Journey.from_dict(j) for j in data.get("journeys", [])]
+        data = self._get("trip", params, result_key="journeys")
+        return [Journey.from_dict(j) for j in data.get("journeys") or []]
 
     # ------------------------------------------------------------------
     # Departure API
@@ -373,6 +488,11 @@ class TripPlannerClient:
         Returns
         -------
         list[StopEvent]
+
+        Raises
+        ------
+        APIError
+            If the API rejects the request (e.g. an invalid date).
         """
         params: dict[str, Any] = {
             "mode": "direct",
@@ -386,8 +506,8 @@ class TripPlannerClient:
             params["name_dm"] = platform_id
             params["nameKey_dm"] = "$USEPOINT$"
 
-        data = self._get("departure_mon", params)
-        return [StopEvent.from_dict(e) for e in data.get("stopEvents", [])]
+        data = self._get("departure_mon", params, result_key="stopEvents")
+        return [StopEvent.from_dict(e) for e in data.get("stopEvents") or []]
 
     # ------------------------------------------------------------------
     # Service Alert API
@@ -410,7 +530,7 @@ class TripPlannerClient:
         stop_id : str, optional
             Only return alerts relevant to this stop.
         current_only : bool
-            Exclude historical/inactive alerts (default ``True``).
+            Exclude historic/inactive alerts (default ``True``).
 
         Returns
         -------
@@ -426,10 +546,10 @@ class TripPlannerClient:
             params["itdLPxx_selStop"] = stop_id
 
         data = self._get("add_info", params)
-        infos = data.get("infos", {})
-        alerts_raw = infos.get("current", []) if current_only else (
-            infos.get("current", []) + infos.get("previous", [])
-        )
+        infos = data.get("infos") or {}
+        alerts_raw = list(infos.get("current") or [])
+        if not current_only:
+            alerts_raw += infos.get("historic") or []
         return [ServiceAlert.from_dict(a) for a in alerts_raw]
 
     # ------------------------------------------------------------------
@@ -438,13 +558,13 @@ class TripPlannerClient:
 
     #: Valid ``type_1`` values for :meth:`find_nearby`.
     NEARBY_TYPES: tuple[str, ...] = (
-        "GIS_POINT",   # Generic point of interest (default)
-        "STOP",        # Public transport stops
-        "POI",         # Points of interest
-        "BUS_POINT",   # Bus stops only
-        "TRAIN_POINT", # Train stations only
-        "FERRY_POINT", # Ferry wharves only
-        "LIGHTRAIL_POINT", # Light rail stops only
+        "GIS_POINT",  # Generic point of interest (default)
+        "STOP",  # Public transport stops
+        "POI",  # Points of interest
+        "BUS_POINT",  # Bus stops only
+        "TRAIN_POINT",  # Train stations only
+        "FERRY_POINT",  # Ferry wharves only
+        "LIGHTRAIL_POINT",  # Light rail stops only
     )
 
     def find_nearby(
@@ -493,7 +613,7 @@ class TripPlannerClient:
             params["inclDrawClasses_1"] = draw_class
 
         data = self._get("coord", params)
-        return [Location.from_dict(loc) for loc in data.get("locations", [])]
+        return [Location.from_dict(loc) for loc in data.get("locations") or []]
 
     # ------------------------------------------------------------------
     # GTFS-Realtime Vehicle Positions API
@@ -520,13 +640,9 @@ class TripPlannerClient:
     #: from v2 automatically. ``metro`` is not listed here: it answers on both,
     #: and defaulting it to v1 keeps existing behaviour unchanged. Pass
     #: ``version="v2"`` to reach the newer metro feed.
-    VEHICLE_POSITION_V2_MODES: frozenset[str] = frozenset(
-        {"sydneytrains", "lightrail/innerwest"}
-    )
+    VEHICLE_POSITION_V2_MODES: frozenset[str] = frozenset({"sydneytrains", "lightrail/innerwest"})
 
-    def vehicle_positions(
-        self, mode: str, *, version: str | None = None
-    ) -> list[VehiclePosition]:
+    def vehicle_positions(self, mode: str, *, version: str | None = None) -> list[VehiclePosition]:
         """
         Fetch live vehicle positions from the GTFS-Realtime feed.
 
@@ -588,7 +704,7 @@ class TripPlannerClient:
         """Close the underlying HTTP session."""
         self._session.close()
 
-    def __enter__(self) -> "TripPlannerClient":
+    def __enter__(self) -> TripPlannerClient:
         return self
 
     def __exit__(self, *_: Any) -> None:

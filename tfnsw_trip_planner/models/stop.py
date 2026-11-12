@@ -1,4 +1,5 @@
 """Stop model."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -24,6 +25,7 @@ def _parse_dt(s: str | None) -> datetime | None:
 @dataclass
 class Stop:
     """A stop within a leg's stop sequence."""
+
     id: str
     name: str
     disassembled_name: str
@@ -36,8 +38,8 @@ class Stop:
     properties: dict[str, Any]
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Stop":
-        props = data.get("properties", {})
+    def from_dict(cls, data: dict) -> Stop:
+        props = data.get("properties") or {}
         wc = props.get("WheelchairAccess", "false")
         coord_raw = data.get("coord")
         return cls(

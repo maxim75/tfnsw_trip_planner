@@ -1,4 +1,5 @@
 """TravelInCars model."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ class TravelInCars:
     message: str
 
     @classmethod
-    def from_properties(cls, props: dict) -> "TravelInCars | None":
+    def from_properties(cls, props: dict) -> TravelInCars | None:
         if "NumberOfCars" not in props and "numberOfCars" not in props:
             return None
         try:
@@ -26,4 +27,7 @@ class TravelInCars:
             return None
 
     def __repr__(self) -> str:
-        return f"TravelInCars(cars={self.number_of_cars}, range={self.from_car}-{self.to_car}, msg={self.message!r})"
+        return (
+            f"TravelInCars(cars={self.number_of_cars}, "
+            f"range={self.from_car}-{self.to_car}, msg={self.message!r})"
+        )
